@@ -18,7 +18,9 @@
   --color-compliant: #16a34a;
   --color-non-compliant: #dc2626;
 
-  --font-body: "Urbanist", system-ui, -apple-system, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
 }
 
 /* ===== THEME: Night ===== */
@@ -103,6 +105,11 @@ body {
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .animate-slide-up {

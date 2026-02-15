@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Scan, ScrollText, Image, Shield, Sparkles, Camera } from "lucide-react";
+import { Scan, ScrollText, Image, Shield, Sparkles, Camera, Eye, Activity } from "lucide-react";
 import type { ReferenceImage } from "./types";
 import StatusBar from "./components/Header";
+import StatusIndicator from "./components/StatusIndicator";
 import ThemeToggle, { applyTheme } from "./components/ThemeToggle";
+import EmptyStateAnimation from "./components/EmptyStateAnimation";
 import VideoInput, { type InputMode } from "./components/VideoInput";
 import PolicyConfig from "./components/PolicyConfig";
 import ReferencesPanel from "./components/ReferencesPanel";
@@ -51,6 +53,7 @@ export default function App() {
   const [stage, setStage] = useState<PipelineStage>("idle");
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [liveReports, setLiveReports] = useState<Report[]>([]);
@@ -109,7 +112,15 @@ export default function App() {
     setStage("uploading");
     setReport(null);
     setError(null);
-    const result = await analyzeVideo(videoFile, policy, (s) => setStage(s as PipelineStage));
+    setUploadProgress(0);
+    
+    const result = await analyzeVideo(
+      videoFile, 
+      policy, 
+      (s) => setStage(s as PipelineStage),
+      (progress) => setUploadProgress(progress)
+    );
+    
     if (result.status === "complete" && result.report) {
       setReport(result.report);
       setStage("complete");
@@ -119,7 +130,12 @@ export default function App() {
     }
   };
 
-  const handleReset = () => { setStage("idle"); setReport(null); setError(null); };
+  const handleReset = () => { 
+    setStage("idle"); 
+    setReport(null); 
+    setError(null);
+    setUploadProgress(0);
+  };
 
   // --- Pipelined monitoring: record chunk N+1 while analyzing chunk N ---
 
@@ -259,19 +275,58 @@ export default function App() {
         }
       }
     }
-    if (!videoEl || !videoEl.srcObject || videoEl.videoWidth === 0) return null;
+    
+    // Ensure video is ready
+    if (!videoEl || !videoEl.srcObject || videoEl.videoWidth === 0 || videoEl.readyState < 2) {
+      console.warn("Video element not ready for capture");
+      return null;
+    }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = videoEl.videoWidth;
-    canvas.height = videoEl.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
+    try {
+      const canvas = document.createElement("canvas");
+      // Use reasonable dimensions to ensure good quality
+      const maxWidth = 640;
+      const maxHeight = 480;
+      let width = videoEl.videoWidth;
+      let height = videoEl.videoHeight;
+      
+      // Scale down if needed while maintaining aspect ratio
+      if (width > maxWidth || height > maxHeight) {
+        const scale = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
 
-    ctx.drawImage(videoEl, 0, 0);
-    // quality 0.6 keeps base64 small (~30-50KB) for fast upload
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-    // Strip the "data:image/jpeg;base64," prefix — backend handles both but smaller payload
-    return dataUrl.split(",")[1] || null;
+      ctx.drawImage(videoEl, 0, 0, width, height);
+      
+      // Use higher quality (0.8) for better image recognition
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      
+      // Validate that we got a proper data URL
+      if (!dataUrl || !dataUrl.startsWith("data:image/jpeg;base64,")) {
+        console.error("Failed to create valid JPEG data URL");
+        return null;
+      }
+      
+      // Strip the "data:image/jpeg;base64," prefix
+      const base64 = dataUrl.split(",")[1];
+      
+      // Validate base64 is not empty or too small
+      if (!base64 || base64.length < 100) {
+        console.error("Generated base64 image is too small or empty");
+        return null;
+      }
+      
+      return base64;
+    } catch (err) {
+      console.error("Error capturing frame:", err);
+      return null;
+    }
   }, []);
 
   /** Analyze a single captured frame. Same prior_context logic as analyzeChunk.
@@ -318,20 +373,26 @@ export default function App() {
   const runMonitoringLoop = useCallback(async () => {
     const mySession = sessionIdRef.current;
     let consecutiveErrors = 0;
-    const BASE_DELAY_MS = 2_000;    // 2s minimum wait between calls (keeps us under RPM limits)
+    const BASE_DELAY_MS = 3_000;    // 3s minimum wait between calls (keeps us under RPM limits)
     const MAX_BACKOFF_MS = 30_000;  // 30s max backoff on repeated errors
 
     // Warm-start health check in background
     healthCheck().catch(() => {});
+    
+    // Wait a bit for webcam to fully initialize
+    await new Promise((r) => setTimeout(r, 1000));
 
     while (monitoringRef.current && sessionIdRef.current === mySession) {
       // 1. Capture a single JPEG frame from the webcam (instant)
       const frameBase64 = captureFrame();
       if (!frameBase64) {
         // Webcam not ready yet — wait a moment and retry
-        await new Promise((r) => setTimeout(r, 500));
+        console.log("Webcam not ready, waiting...");
+        await new Promise((r) => setTimeout(r, 1000));
         continue;
       }
+      
+      console.log(`Captured frame: ${frameBase64.length} chars`);
       if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
 
       // 2. Send frame to backend and wait for result (~2-3s)
@@ -385,8 +446,9 @@ export default function App() {
     <div className="min-h-screen flex" style={{ background: "var(--color-bg)" }}>
       {/* Floating side panel */}
       <div
-        className="w-[400px] shrink-0 flex flex-col m-3 rounded-lg border overflow-hidden"
+        className="w-[400px] shrink-0 flex flex-col m-3 border overflow-hidden"
         style={{
+          borderRadius: "4px",
           borderColor: "var(--color-border)",
           background: "var(--color-surface)",
           boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
@@ -398,12 +460,20 @@ export default function App() {
           {/* Logo row */}
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded" style={{ background: "var(--color-accent)" }}>
-                <Shield className="w-4 h-4" style={{ color: "var(--color-bg)" }} />
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-20 blur-xl" />
+                <div className="relative p-2 bg-gradient-to-br from-blue-500 to-purple-600" style={{ borderRadius: "4px" }}>
+                  <Eye className="w-5 h-5 text-white" />
+                </div>
               </div>
-              <span className="text-sm font-bold tracking-tight" style={{ color: "var(--color-text)" }}>
-                Compliance Vision
-              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold tracking-tight" style={{ color: "var(--color-text)" }}>
+                    Compliance Vision
+                  </span>
+                  <StatusIndicator />
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <StatusBar />
@@ -490,7 +560,7 @@ export default function App() {
                     Analyze Video
                   </button>
 
-                  {stage !== "idle" && <PipelineStatus stage={stage} error={error} />}
+                  {stage !== "idle" && <PipelineStatus stage={stage} error={error} uploadProgress={uploadProgress} />}
 
                   {(stage === "complete" || stage === "error") && (
                     <button
@@ -543,60 +613,24 @@ export default function App() {
         {inputMode === "file" ? (
           report ? (
             <ReportView report={report} />
-          ) : (
+          ) : isFileRunning ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-5 max-w-sm mx-auto">
-                {isFileRunning ? (
-                  <>
-                    <div className="relative mx-auto w-16 h-16">
-                      <Scan className="w-16 h-16 animate-pulse-glow" style={{ color: "var(--color-accent)" }} />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-                        Analyzing video...
-                      </p>
-                      <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-                        Running change detection, VLM analysis, and policy evaluation.
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center"
-                      style={{ background: "var(--color-surface-2)", border: "2px dashed var(--color-border)" }}
-                    >
-                      <Scan className="w-9 h-9" style={{ color: "var(--color-border)" }} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-base font-semibold" style={{ color: "var(--color-text)" }}>
-                        Waiting for Analysis
-                      </p>
-                      <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-dim)" }}>
-                        Upload a video and configure your compliance policy on the left, then hit <span className="font-medium" style={{ color: "var(--color-text)" }}>Analyze Video</span> to generate a report.
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-center gap-4 pt-2">
-                      {[
-                        { icon: "1", text: "Upload video" },
-                        { icon: "2", text: "Set policy" },
-                        { icon: "3", text: "Run analysis" },
-                      ].map((step) => (
-                        <div key={step.icon} className="flex items-center gap-1.5">
-                          <span
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                            style={{ background: "var(--color-surface-2)", color: "var(--color-text-dim)", border: "1px solid var(--color-border)" }}
-                          >
-                            {step.icon}
-                          </span>
-                          <span className="text-[11px]" style={{ color: "var(--color-text-dim)" }}>{step.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+                <div className="relative mx-auto w-16 h-16">
+                  <Scan className="w-16 h-16 animate-pulse-glow" style={{ color: "var(--color-accent)" }} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                    Analyzing video...
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    Running change detection, VLM analysis, and policy evaluation.
+                  </p>
+                </div>
               </div>
             </div>
+          ) : (
+            <EmptyStateAnimation />
           )
         ) : liveReports.length > 0 || isMonitoring ? (
           <LiveReportView
@@ -605,41 +639,7 @@ export default function App() {
             sessionStart={sessionStart}
           />
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-5 max-w-sm mx-auto">
-              <div
-                className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center"
-                style={{ background: "var(--color-surface-2)", border: "2px dashed var(--color-border)" }}
-              >
-                <Camera className="w-9 h-9" style={{ color: "var(--color-border)" }} />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-base font-semibold" style={{ color: "var(--color-text)" }}>
-                  Ready to Monitor
-                </p>
-                <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-dim)" }}>
-                  Configure your compliance policy and start webcam monitoring. Live results will stream here in real time.
-                </p>
-              </div>
-              <div className="flex items-center justify-center gap-4 pt-2">
-                {[
-                  { icon: "1", text: "Set policy" },
-                  { icon: "2", text: "Start webcam" },
-                  { icon: "3", text: "View live" },
-                ].map((step) => (
-                  <div key={step.icon} className="flex items-center gap-1.5">
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                      style={{ background: "var(--color-surface-2)", color: "var(--color-text-dim)", border: "1px solid var(--color-border)" }}
-                    >
-                      {step.icon}
-                    </span>
-                    <span className="text-[11px]" style={{ color: "var(--color-text-dim)" }}>{step.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <EmptyStateAnimation />
         )}
       </div>
     </div>

@@ -13,6 +13,7 @@ import logging
 
 from backend.core.config import openai_client as client
 from backend.models.schemas import KeyframeData, FrameObservation, PersonDetail, Policy, ReferenceImage
+from backend.services.api_utils import exponential_backoff_retry, track_usage, check_rate_limit, estimate_cost
 
 logger = logging.getLogger(__name__)
 
@@ -181,12 +182,41 @@ async def _analyze_batch(
     """Send a batch of keyframes to GPT-4o and parse observations."""
     messages = _build_batch_messages(batch, policy_context, policy)
 
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        max_tokens=1000,
-        temperature=0.1,  # Low temp for factual descriptions
+    # Check rate limit before making call
+    if not check_rate_limit("vlm", max_per_minute=30, max_per_hour=500):
+        logger.warning("⚠️ VLM rate limit approaching, adding delay...")
+        await asyncio.sleep(2.0)
+
+    # Wrap API call in retry logic
+    async def make_api_call():
+        return await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            max_tokens=1000,
+            temperature=0.1,  # Low temp for factual descriptions
+        )
+
+    response = await exponential_backoff_retry(
+        make_api_call,
+        max_retries=3,
+        initial_delay=1.0,
+        service_name="VLM",
     )
+
+    # Track usage
+    if response.usage:
+        cost = estimate_cost(
+            "vlm",
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+            model="gpt-4o-mini"
+        )
+        track_usage(
+            "vlm",
+            tokens=response.usage.total_tokens,
+            cost=cost,
+            metadata={"batch_size": len(batch)}
+        )
 
     raw_text = response.choices[0].message.content or "[]"
 

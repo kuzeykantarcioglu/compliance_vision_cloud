@@ -10,9 +10,12 @@ and one full API round-trip vs doing them separately.
 
 import json
 import logging
+import asyncio
 from datetime import datetime, timezone
 
 from backend.core.config import openai_client as client
+from backend.services.api_utils import exponential_backoff_retry, track_usage, check_rate_limit, estimate_cost
+from backend.services.compliance_state import compliance_tracker
 from backend.models.schemas import (
     FrameObservation,
     KeyframeData,
@@ -136,6 +139,84 @@ REPORT_SCHEMA = {
 }
 
 
+def _apply_dual_mode_filtering(
+    verdicts_data: list,
+    policy: Policy,
+    observations: list[FrameObservation]
+) -> tuple[list[Verdict], list[Verdict]]:
+    """Apply dual-mode filtering to verdicts.
+    
+    For checklist mode rules:
+    - Check if compliance is still valid from previous verification
+    - Update compliance state when rules are satisfied
+    - Filter out spam violations for already-compliant items
+    
+    Returns: (all_verdicts, incidents)
+    """
+    all_verdicts = []
+    incidents = []
+    
+    # Map rule descriptions to rule objects
+    rule_map = {rule.description: rule for rule in policy.rules}
+    
+    # Get all person IDs from observations
+    people_ids = set()
+    for obs in observations:
+        for person in obs.people:
+            people_ids.add(person.person_id)
+    if not people_ids:
+        people_ids = {"unknown"}  # Default if no people identified
+    
+    for v in verdicts_data:
+        rule_desc = v.get("rule_description", "")
+        rule = rule_map.get(rule_desc)
+        
+        # Determine mode
+        mode = rule.mode if rule else "incident"
+        is_compliant = v.get("compliant", True)
+        
+        # For checklist mode, check and update state
+        if mode == "checklist":
+            # Check if anyone is still compliant from before
+            anyone_still_compliant = False
+            for person_id in people_ids:
+                is_valid, state = compliance_tracker.check_compliance(person_id, rule)
+                if is_valid:
+                    anyone_still_compliant = True
+                    # Override verdict to compliant
+                    is_compliant = True
+                    v["reason"] = f"Previously verified (still valid)"
+                    break
+            
+            # Update state if newly compliant
+            if is_compliant and not anyone_still_compliant:
+                for person_id in people_ids:
+                    compliance_tracker.update_compliance(person_id, rule, True)
+        
+        # Create verdict with mode info
+        verdict = Verdict(
+            rule_type=v.get("rule_type", "unknown"),
+            rule_description=rule_desc,
+            compliant=is_compliant,
+            severity=v.get("severity", "medium"),
+            reason=v.get("reason", ""),
+            timestamp=v.get("timestamp"),
+            mode=mode,
+            checklist_status="compliant" if (mode == "checklist" and is_compliant) else None,
+        )
+        
+        all_verdicts.append(verdict)
+        
+        # Only add to incidents if it's a real violation
+        if not verdict.compliant:
+            # For incident mode, always report
+            # For checklist mode, only report if not filtered
+            if mode == "incident" or not anyone_still_compliant:
+                incidents.append(verdict)
+    
+    return all_verdicts, incidents
+
+
 def _format_observations(observations: list[FrameObservation]) -> str:
     """Format VLM observations into a readable block for the LLM."""
     lines = []
@@ -164,8 +245,12 @@ def _format_policy(policy: Policy) -> str:
     """Format the policy into a readable block for the LLM."""
     lines = ["COMPLIANCE POLICY RULES:"]
     for i, rule in enumerate(policy.rules, 1):
-        freq_tag = _format_frequency(rule)
-        lines.append(f"  {i}. [{rule.severity.upper()}] [{freq_tag}] ({rule.type}) {rule.description}")
+        # Show mode instead of frequency
+        mode = getattr(rule, "mode", "incident")
+        mode_tag = "INCIDENT" if mode == "incident" else f"CHECKLIST"
+        if mode == "checklist" and rule.validity_duration:
+            mode_tag += f" ({rule.validity_duration}s validity)"
+        lines.append(f"  {i}. [{rule.severity.upper()}] [{mode_tag}] ({rule.type}) {rule.description}")
     if policy.custom_prompt:
         lines.append(f"\nADDITIONAL POLICY CONTEXT: {policy.custom_prompt}")
     return "\n".join(lines)
@@ -234,23 +319,52 @@ Evaluate each policy rule against these observations""" + (
         " and the audio transcript" if transcript_text else ""
     ) + ". Produce a compliance report. Be concise."
 
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "compliance_report",
-                "strict": True,
-                "schema": REPORT_SCHEMA,
+    # Check rate limit
+    if not check_rate_limit("policy_eval", max_per_minute=30, max_per_hour=500):
+        logger.warning("⚠️ Policy evaluation rate limit approaching, adding delay...")
+        await asyncio.sleep(2.0)
+
+    # Wrap API call in retry logic
+    async def make_api_call():
+        return await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "compliance_report",
+                    "strict": True,
+                    "schema": REPORT_SCHEMA,
+                },
             },
-        },
-        temperature=0.1,
-        max_tokens=1200,  # Reduced — we want concise reports
+            temperature=0.1,
+            max_tokens=1200,  # Reduced — we want concise reports
+        )
+
+    response = await exponential_backoff_retry(
+        make_api_call,
+        max_retries=3,
+        initial_delay=1.0,
+        service_name="Policy Evaluation",
     )
+
+    # Track usage
+    if response.usage:
+        cost = estimate_cost(
+            "policy_eval",
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+            model="gpt-4o-mini"
+        )
+        track_usage(
+            "policy_eval",
+            tokens=response.usage.total_tokens,
+            cost=cost,
+            metadata={"num_rules": len(policy.rules), "num_observations": len(observations)}
+        )
 
     raw = response.choices[0].message.content or "{}"
     logger.info(f"Policy evaluation response received ({len(raw)} chars)")
@@ -274,21 +388,12 @@ Evaluate each policy rule against these observations""" + (
             video_duration=video_duration,
         )
 
-    # Parse verdicts
-    all_verdicts = []
-    incidents = []
-    for v in data.get("verdicts", []):
-        verdict = Verdict(
-            rule_type=v.get("rule_type", "unknown"),
-            rule_description=v.get("rule_description", ""),
-            compliant=v.get("compliant", True),
-            severity=v.get("severity", "medium"),
-            reason=v.get("reason", ""),
-            timestamp=v.get("timestamp"),
-        )
-        all_verdicts.append(verdict)
-        if not verdict.compliant:
-            incidents.append(verdict)
+    # Parse verdicts with dual-mode filtering
+    all_verdicts, incidents = _apply_dual_mode_filtering(
+        data.get("verdicts", []),
+        policy,
+        observations
+    )
 
     # Parse person summaries
     person_summaries = []
@@ -429,23 +534,52 @@ async def analyze_and_evaluate_combined(
 
     logger.info(f"Combined analysis: {len(keyframes)} frames, {len(policy.rules)} rules")
 
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": COMBINED_PROMPT},
-            {"role": "user", "content": content},
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "compliance_report",
-                "strict": True,
-                "schema": COMBINED_REPORT_SCHEMA,
+    # Check rate limit
+    if not check_rate_limit("combined_analysis", max_per_minute=60, max_per_hour=1000):
+        logger.warning("⚠️ Combined analysis rate limit approaching, adding delay...")
+        await asyncio.sleep(1.5)
+
+    # Wrap API call in retry logic
+    async def make_api_call():
+        return await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": COMBINED_PROMPT},
+                {"role": "user", "content": content},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "compliance_report",
+                    "strict": True,
+                    "schema": COMBINED_REPORT_SCHEMA,
+                },
             },
-        },
-        temperature=0.0,
-        max_tokens=600,
+            temperature=0.0,
+            max_tokens=600,
+        )
+
+    response = await exponential_backoff_retry(
+        make_api_call,
+        max_retries=3,
+        initial_delay=0.5,  # Faster retry for webcam
+        service_name="Combined Analysis",
     )
+
+    # Track usage
+    if response.usage:
+        cost = estimate_cost(
+            "combined_analysis",
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+            model="gpt-4o-mini"
+        )
+        track_usage(
+            "combined_analysis",
+            tokens=response.usage.total_tokens,
+            cost=cost,
+            metadata={"num_frames": len(keyframes)}
+        )
 
     raw = response.choices[0].message.content or "{}"
     logger.info(f"Combined analysis response received ({len(raw)} chars)")
@@ -462,21 +596,24 @@ async def analyze_and_evaluate_combined(
             video_duration=video_duration,
         )
 
-    # Parse verdicts
-    all_verdicts = []
-    incidents = []
-    for v in data.get("verdicts", []):
-        verdict = Verdict(
-            rule_type=v.get("rule_type", "unknown"),
-            rule_description=v.get("rule_description", ""),
-            compliant=v.get("compliant", True),
-            severity=v.get("severity", "medium"),
-            reason=v.get("reason", ""),
-            timestamp=v.get("timestamp"),
-        )
-        all_verdicts.append(verdict)
-        if not verdict.compliant:
-            incidents.append(verdict)
+    # Parse frame observations if present
+    observations = []
+    for obs in data.get("frame_observations", []):
+        observations.append(FrameObservation(
+            timestamp=obs.get("timestamp", 0.0),
+            description=obs.get("description", ""),
+            trigger=obs.get("trigger", "monitoring"),
+            change_score=obs.get("change_score", 1.0),
+            image_base64=keyframes[0].image_base64 if keyframes else "",
+            people=[]
+        ))
+
+    # Parse verdicts with dual-mode filtering
+    all_verdicts, incidents = _apply_dual_mode_filtering(
+        data.get("verdicts", []),
+        policy,
+        observations
+    )
 
     # Parse person summaries
     person_summaries = []
@@ -492,17 +629,18 @@ async def analyze_and_evaluate_combined(
             thumbnail_base64="",
         ))
 
-    # Build frame observations (lightweight — just timestamps + images, no VLM descriptions)
-    observations = [
-        FrameObservation(
-            timestamp=kf.timestamp,
-            description="",
-            trigger=kf.trigger,
-            change_score=kf.change_score,
-            image_base64=kf.image_base64,
-        )
-        for kf in keyframes
-    ]
+    # If we didn't get observations from the response, build them from keyframes
+    if not observations:
+        observations = [
+            FrameObservation(
+                timestamp=kf.timestamp,
+                description="",
+                trigger=kf.trigger,
+                change_score=kf.change_score,
+                image_base64=kf.image_base64,
+            )
+            for kf in keyframes
+        ]
 
     return Report(
         video_id=video_id,

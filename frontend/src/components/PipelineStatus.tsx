@@ -4,6 +4,7 @@ import type { PipelineStage } from "../types";
 interface Props {
   stage: PipelineStage;
   error?: string | null;
+  uploadProgress?: number;
 }
 
 const STAGES = [
@@ -14,7 +15,7 @@ const STAGES = [
   { key: "complete", label: "Report Ready", icon: FileText },
 ] as const;
 
-export default function PipelineStatus({ stage, error }: Props) {
+export default function PipelineStatus({ stage, error, uploadProgress }: Props) {
   if (stage === "idle") return null;
 
   if (stage === "error") {
@@ -70,7 +71,12 @@ export default function PipelineStatus({ stage, error }: Props) {
                 }}
               >
                 {s.label}
-                {isActive && (
+                {isActive && s.key === "uploading" && uploadProgress !== undefined && uploadProgress < 100 && (
+                  <span className="ml-2" style={{ color: "var(--color-accent)" }}>
+                    {uploadProgress}%
+                  </span>
+                )}
+                {isActive && (s.key !== "uploading" || uploadProgress === undefined || uploadProgress === 100) && (
                   <span className="animate-pulse-glow ml-1.5" style={{ color: "var(--color-text-dim)" }}>
                     ...
                   </span>

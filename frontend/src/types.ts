@@ -4,6 +4,13 @@ export interface PolicyRule {
   type: string;
   description: string;
   severity: "low" | "medium" | "high" | "critical";
+  
+  // Dual-mode compliance fields
+  mode?: "incident" | "checklist";
+  validity_duration?: number; // seconds
+  recheck_prompt?: string;
+  
+  // Legacy fields
   frequency?: "always" | "at_least_once" | "at_least_n";
   frequency_count?: number;
 }
@@ -52,6 +59,11 @@ export interface Verdict {
   severity: "low" | "medium" | "high" | "critical";
   reason: string;
   timestamp: number | null;
+  
+  // Dual-mode fields
+  mode?: "incident" | "checklist";
+  checklist_status?: "pending" | "compliant" | "expired";
+  expires_at?: number;
 }
 
 export interface TranscriptSegment {

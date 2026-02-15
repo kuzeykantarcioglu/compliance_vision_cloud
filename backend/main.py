@@ -21,6 +21,17 @@ from backend.core.config import OPENAI_API_KEY
 from backend.routers.analyze import router as analyze_router
 from backend.routers.polly import router as polly_router
 
+logger = logging.getLogger(__name__)
+
+# Optional async features (require Redis/Celery)
+try:
+    from backend.routers.async_analyze import router as async_router
+    from backend.routers.websocket import router as websocket_router
+    ASYNC_ENABLED = True
+except ImportError as e:
+    logger.warning(f"Async features disabled (Redis/Celery not available): {e}")
+    ASYNC_ENABLED = False
+
 app = FastAPI(
     title="Compliance Vision API",
     description="AI-powered video compliance monitoring",
@@ -40,10 +51,51 @@ app.add_middleware(
 app.include_router(analyze_router)
 app.include_router(polly_router)
 
+# Include async routers if available
+if ASYNC_ENABLED:
+    app.include_router(async_router)
+    app.include_router(websocket_router)
+    logger.info("✅ Async features enabled (Celery + WebSocket)")
+else:
+    logger.info("⚠️ Running without async features (install Redis + run Celery for full functionality)")
+
 
 @app.get("/health")
 async def health_check():
-    return {
+    """Health check endpoint with service status."""
+    health_status = {
         "status": "ok",
         "openai_key_set": bool(OPENAI_API_KEY),
     }
+    
+    # Check Redis connection (if available)
+    try:
+        from backend.services.celery_app import redis_client
+        redis_client.ping()
+        health_status["redis"] = "connected"
+    except ImportError:
+        health_status["redis"] = "not installed"
+    except Exception as e:
+        health_status["redis"] = f"error: {e}"
+        health_status["status"] = "degraded"
+    
+    # Check Celery workers (if available)
+    try:
+        from backend.services.celery_app import app as celery_app
+        inspect = celery_app.control.inspect()
+        stats = inspect.stats()
+        health_status["celery_workers"] = len(stats) if stats else 0
+    except ImportError:
+        health_status["celery_workers"] = "not installed"
+    except Exception as e:
+        health_status["celery_workers"] = 0
+        health_status["celery_error"] = str(e)
+    
+    # Get API usage stats
+    try:
+        from backend.services.api_utils import get_usage_stats
+        health_status["api_usage"] = get_usage_stats()
+    except:
+        pass
+    
+    return health_status

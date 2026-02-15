@@ -412,30 +412,66 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
                   ))}
                 </select>
                 <select
-                  value={rule.frequency || "always"}
-                  onChange={(e) => updateRule(i, { frequency: e.target.value as PolicyRule["frequency"] })}
+                  value={rule.mode || "incident"}
+                  onChange={(e) => updateRule(i, { mode: e.target.value as "incident" | "checklist" })}
                   disabled={disabled}
                   className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent"
-                  style={{ borderColor: "var(--color-border)", color: "var(--color-accent)" }}
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  title="Compliance mode"
                 >
-                  {FREQUENCY_OPTIONS.map((f) => (
-                    <option key={f.value} value={f.value} style={{ background: "var(--color-surface)" }}>
-                      {f.label}
-                    </option>
-                  ))}
+                  <option value="incident" style={{ background: "var(--color-surface)" }}>
+                    INCIDENT
+                  </option>
+                  <option value="checklist" style={{ background: "var(--color-surface)" }}>
+                    CHECKLIST
+                  </option>
                 </select>
-                {rule.frequency === "at_least_n" && (
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={rule.frequency_count || 1}
-                    onChange={(e) => updateRule(i, { frequency_count: Math.max(1, parseInt(e.target.value) || 1) })}
+                {rule.mode === "checklist" ? (
+                  <select
+                    value={rule.validity_duration || 28800}
+                    onChange={(e) => updateRule(i, { validity_duration: parseInt(e.target.value) })}
                     disabled={disabled}
-                    className="text-xs px-2 py-1.5 rounded border bg-transparent w-14 text-center shrink-0"
+                    className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent"
                     style={{ borderColor: "var(--color-border)", color: "var(--color-accent)" }}
-                    title="Number of times required"
-                  />
+                    title="Validity duration"
+                  >
+                    <option value={60} style={{ background: "var(--color-surface)" }}>1 MIN</option>
+                    <option value={300} style={{ background: "var(--color-surface)" }}>5 MIN</option>
+                    <option value={1800} style={{ background: "var(--color-surface)" }}>30 MIN</option>
+                    <option value={3600} style={{ background: "var(--color-surface)" }}>1 HOUR</option>
+                    <option value={28800} style={{ background: "var(--color-surface)" }}>8 HOURS</option>
+                    <option value={86400} style={{ background: "var(--color-surface)" }}>24 HOURS</option>
+                    <option value={0} style={{ background: "var(--color-surface)" }}>FOREVER</option>
+                  </select>
+                ) : (
+                  <>
+                    <select
+                      value={rule.frequency || "always"}
+                      onChange={(e) => updateRule(i, { frequency: e.target.value as PolicyRule["frequency"] })}
+                      disabled={disabled}
+                      className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-accent)" }}
+                    >
+                      {FREQUENCY_OPTIONS.map((f) => (
+                        <option key={f.value} value={f.value} style={{ background: "var(--color-surface)" }}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                    {rule.frequency === "at_least_n" && (
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={rule.frequency_count || 1}
+                        onChange={(e) => updateRule(i, { frequency_count: Math.max(1, parseInt(e.target.value) || 1) })}
+                        disabled={disabled}
+                        className="text-xs px-2 py-1.5 rounded border bg-transparent w-14 text-center shrink-0"
+                        style={{ borderColor: "var(--color-border)", color: "var(--color-accent)" }}
+                        title="Number of times required"
+                      />
+                    )}
+                  </>
                 )}
               </div>
               <input

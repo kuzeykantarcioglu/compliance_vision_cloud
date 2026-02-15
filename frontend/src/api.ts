@@ -9,7 +9,8 @@ const api = axios.create({
 export async function analyzeVideo(
   videoFile: File,
   policy: Policy,
-  onStageChange?: (stage: string) => void
+  onStageChange?: (stage: string) => void,
+  onUploadProgress?: (percent: number) => void
 ): Promise<AnalyzeResponse> {
   onStageChange?.("uploading");
 
@@ -19,13 +20,31 @@ export async function analyzeVideo(
 
   // Stage transitions are approximate — we can't see inside the backend
   // but we know the pipeline order
-  const stageTimer = setTimeout(() => onStageChange?.("detecting"), 1000);
-  const stageTimer2 = setTimeout(() => onStageChange?.("analyzing"), 5000);
-  const stageTimer3 = setTimeout(() => onStageChange?.("evaluating"), 15000);
+  let uploadComplete = false;
+  const stageTimer = setTimeout(() => {
+    if (uploadComplete) onStageChange?.("detecting");
+  }, 1000);
+  const stageTimer2 = setTimeout(() => {
+    if (uploadComplete) onStageChange?.("analyzing");
+  }, 5000);
+  const stageTimer3 = setTimeout(() => {
+    if (uploadComplete) onStageChange?.("evaluating");
+  }, 15000);
 
   try {
     const res = await api.post<AnalyzeResponse>("/analyze/", formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onUploadProgress?.(percent);
+          if (percent === 100) {
+            uploadComplete = true;
+            // Give server a moment to process, then move to detecting
+            setTimeout(() => onStageChange?.("detecting"), 500);
+          }
+        }
+      },
     });
     clearTimeout(stageTimer);
     clearTimeout(stageTimer2);
