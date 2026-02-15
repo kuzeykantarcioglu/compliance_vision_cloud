@@ -285,6 +285,19 @@ class FrameAnalyzeRequest(BaseModel):
     )
 
 
+class ParallelBatchRequest(BaseModel):
+    """Multiple frame batches for concurrent DGX analysis."""
+    batches: list[list[str]] = Field(
+        ...,
+        description='Array of frame batches. Each batch is a list of base64-encoded JPEG frames.',
+    )
+    policy_json: str = Field(..., description="JSON-stringified Policy object")
+    max_concurrent: int = Field(
+        default=3,
+        description='Maximum number of concurrent DGX API calls (default 3)',
+    )
+
+
 # ---------------------------------------------------------------------------
 # Video processing intermediate result
 # ---------------------------------------------------------------------------

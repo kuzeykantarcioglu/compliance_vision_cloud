@@ -19,14 +19,14 @@ from starlette.datastructures import FormData
 from backend.core.config import UPLOAD_DIR, KEYFRAMES_DIR
 from backend.models.schemas import (
     Policy, PolicyRule, AnalyzeResponse, Report, Verdict,
-    KeyframeData, FrameAnalyzeRequest,
+    KeyframeData, FrameAnalyzeRequest, ParallelBatchRequest,
 )
 from backend.services.video import process_video
 from backend.services.vlm import analyze_frames
 from backend.services.policy import evaluate_and_report, analyze_and_evaluate_combined
 from backend.services.whisper import transcribe_video
 from backend.services.speech_policy import evaluate_speech
-from backend.services.dgx import analyze_frame_dgx
+from backend.services.dgx import analyze_frame_dgx, analyze_frames_dgx_parallel
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 logger = logging.getLogger(__name__)
@@ -469,6 +469,72 @@ async def analyze_frame(request: FrameAnalyzeRequest):
         f"📸 Frame analysis ({provider}): {elapsed:.2f}s"
         f" | {'COMPLIANT' if report.overall_compliant else 'NON-COMPLIANT'}"
         f" | {len(report.person_summaries)} people"
+    )
+
+    return AnalyzeResponse(status="complete", report=report)
+
+# ---------------------------------------------------------------------------
+# Parallel DGX batch analysis — multiple concurrent requests for maximum speed
+# ---------------------------------------------------------------------------
+
+@router.post("/frame/parallel", response_model=AnalyzeResponse)
+async def analyze_frames_parallel(request: ParallelBatchRequest):
+    """Parallel DGX analysis: send multiple frame batches concurrently.
+
+    Accepts multiple batches of JPEG frames and fires them all at the DGX
+    Spark proxy simultaneously. Each batch is converted to an mp4 clip
+    independently. Results are merged into a single consolidated report.
+
+    This is significantly faster than sequential analysis when the DGX
+    proxy can handle concurrent requests.
+    """
+    t0 = time.perf_counter()
+    logger.info(f"🚀 PARALLEL DGX REQUEST: {len(request.batches)} batches, max_concurrent={request.max_concurrent}")
+
+    # Parse policy
+    try:
+        policy = Policy(**json.loads(request.policy_json))
+    except Exception as e:
+        logger.error(f"❌ Invalid policy JSON: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid policy JSON: {e}")
+
+    if not policy.rules and not policy.custom_prompt:
+        raise HTTPException(status_code=400, detail="Policy must have at least one rule or a custom prompt.")
+
+    if not request.batches:
+        raise HTTPException(status_code=400, detail="No frame batches provided.")
+
+    # Flatten all frames from all batches
+    all_frames = []
+    for batch in request.batches:
+        # Strip data URI prefix if present
+        cleaned = []
+        for frame in batch:
+            if frame.startswith("data:"):
+                frame = frame.split(",", 1)[1]
+            cleaned.append(frame)
+        all_frames.extend(cleaned)
+
+    if not all_frames:
+        raise HTTPException(status_code=400, detail="All batches are empty.")
+
+    try:
+        report = await analyze_frames_dgx_parallel(
+            frames=all_frames,
+            policy=policy,
+            max_concurrent=min(request.max_concurrent, 5),  # cap at 5
+            chunk_size=4,  # 4 frames per sub-request (~1s clip each)
+        )
+    except Exception as e:
+        logger.error(f"❌ Parallel DGX analysis FAILED: {e}", exc_info=True)
+        return AnalyzeResponse(status="error", error=f"[Parallel DGX Analysis] {e}")
+
+    elapsed = time.perf_counter() - t0
+    logger.info(
+        f"🏁 Parallel DGX: {elapsed:.2f}s"
+        f" | {'COMPLIANT' if report.overall_compliant else 'NON-COMPLIANT'}"
+        f" | {len(report.person_summaries)} people"
+        f" | {len(request.batches)} batches → {len(all_frames)} total frames"
     )
 
     return AnalyzeResponse(status="complete", report=report)

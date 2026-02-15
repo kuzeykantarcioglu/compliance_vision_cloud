@@ -13,7 +13,7 @@ import PipelineStatus from "./components/PipelineStatus";
 import ReportView from "./components/ReportView";
 import LiveReportView from "./components/LiveReportView";
 import ProviderToggle from "./components/ProviderToggle";
-import { analyzeVideo, analyzeFrame, analyzeFrameBatch, healthCheck } from "./api";
+import { analyzeVideo, analyzeFrame, analyzeFrameBatch, analyzeFrameBatchParallel, healthCheck } from "./api";
 import type { Policy, Report, PipelineStage } from "./types";
 
 // Apply saved theme before first paint to avoid flash
@@ -395,6 +395,33 @@ export default function App() {
     }
   }, [buildPriorContext]);
 
+  /** DGX parallel batch analysis: send multiple frame batches concurrently.
+   *  Returns true on success, false on error. */
+  const analyzeDgxParallel = useCallback(async (batches: string[][], mySession: number): Promise<boolean> => {
+    setLiveStage("analyzing");
+
+    const currentPolicy = { ...policyRef.current };
+    const priorCtx = buildPriorContext(liveReportsRef.current);
+    if (priorCtx) {
+      currentPolicy.prior_context = priorCtx;
+    }
+
+    const result = await analyzeFrameBatchParallel(batches, currentPolicy, 3);
+    if (!monitoringRef.current || sessionIdRef.current !== mySession) return false;
+
+    if (result.status === "complete" && result.report) {
+      setLiveReports((prev) => [...prev, result.report!]);
+      setChunksProcessed((prev) => prev + 1);
+      setLiveStage("complete");
+      setLiveError(null);
+      return true;
+    } else {
+      setLiveError(result.error || "DGX parallel analysis failed.");
+      setLiveStage("error");
+      return false;
+    }
+  }, [buildPriorContext]);
+
   /**
    * Frame-capture monitoring loop.
    *
@@ -403,8 +430,11 @@ export default function App() {
    * **OpenAI mode:** Tight loop — capture single JPEG → send to /analyze/frame → repeat.
    *   ~2-4s per cycle with 3s rate-limit pacing.
    *
-   * **DGX mode:** Buffer 12 frames over 3 seconds at 4fps (exactly like security.py),
-   *   stitch into mp4 video on the backend, send to DGX Cosmos proxy → repeat.
+   * **DGX mode (PIPELINED):**
+   *   Captures frames continuously at 4fps. Sends batches to the backend
+   *   in parallel — multiple DGX requests can be in-flight simultaneously.
+   *   While waiting for DGX responses, keeps capturing frames for the next batch.
+   *   This maximizes throughput by overlapping capture and analysis.
    *
    * Includes exponential backoff on errors to avoid hammering the API.
    */
@@ -413,28 +443,34 @@ export default function App() {
     let consecutiveErrors = 0;
     const isDgx = providerRef.current === "dgx";
 
-    // DGX: match security.py timing (3s clip, 4fps = 12 frames)
-    const DGX_CLIP_DURATION_MS = 3_000;
+    // DGX: capture parameters
     const DGX_FPS = 4;
-    const DGX_TOTAL_FRAMES = (DGX_CLIP_DURATION_MS / 1000) * DGX_FPS; // 12
-    const DGX_FRAME_INTERVAL_MS = DGX_CLIP_DURATION_MS / DGX_TOTAL_FRAMES; // 250ms
+    const DGX_FRAME_INTERVAL_MS = 1000 / DGX_FPS; // 250ms
+    const DGX_FRAMES_PER_BATCH = 4; // 4 frames = 1 second clip per batch
+    const DGX_BATCHES_PER_CYCLE = 3; // 3 concurrent batches = 3 seconds coverage
+    const DGX_TOTAL_FRAMES = DGX_FRAMES_PER_BATCH * DGX_BATCHES_PER_CYCLE; // 12 frames
 
-    const BASE_DELAY_MS = isDgx ? 500 : 3_000;
+    const BASE_DELAY_MS = isDgx ? 200 : 3_000; // Much shorter delay for DGX — pipelined
     const MAX_BACKOFF_MS = isDgx ? 10_000 : 30_000;
+
+    // Track in-flight DGX requests for pipelining
+    const inFlightRequests: Set<Promise<boolean>> = new Set();
+    const MAX_IN_FLIGHT = 2; // Max parallel analysis cycles
 
     // Wait a bit for webcam to fully initialize
     await new Promise((r) => setTimeout(r, 1000));
 
     while (monitoringRef.current && sessionIdRef.current === mySession) {
       if (isDgx) {
-        // --- DGX mode: capture 12 frames over 3 seconds, send as batch ---
+        // --- DGX PIPELINED mode: capture + analyze overlap ---
         setLiveStage("capturing" as any);
-        const frames: string[] = [];
 
+        // Capture frames continuously
+        const allFrames: string[] = [];
         for (let i = 0; i < DGX_TOTAL_FRAMES; i++) {
           if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
           const frame = captureFrame();
-          if (frame) frames.push(frame);
+          if (frame) allFrames.push(frame);
           if (i < DGX_TOTAL_FRAMES - 1) {
             await new Promise((r) => setTimeout(r, DGX_FRAME_INTERVAL_MS));
           }
@@ -442,24 +478,54 @@ export default function App() {
 
         if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
 
-        if (frames.length === 0) {
+        if (allFrames.length === 0) {
           console.log("Webcam not ready, waiting...");
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
 
-        console.log(`[DGX] Captured ${frames.length} frames over ${DGX_CLIP_DURATION_MS / 1000}s, sending batch...`);
+        // Split into sub-batches for parallel processing
+        const batches: string[][] = [];
+        for (let i = 0; i < allFrames.length; i += DGX_FRAMES_PER_BATCH) {
+          const batch = allFrames.slice(i, i + DGX_FRAMES_PER_BATCH);
+          if (batch.length > 0) batches.push(batch);
+        }
 
-        const success = await analyzeDgxBatch(frames, mySession);
-        if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+        console.log(`[DGX] Captured ${allFrames.length} frames → ${batches.length} parallel batches`);
 
-        if (!success) {
+        // Wait if too many requests are in-flight to avoid overloading
+        while (inFlightRequests.size >= MAX_IN_FLIGHT) {
+          await Promise.race([...inFlightRequests]);
+        }
+
+        // Fire parallel analysis (don't await — pipeline with next capture)
+        const analysisPromise = (async (): Promise<boolean> => {
+          const success = await analyzeDgxParallel(batches, mySession);
+          return success;
+        })();
+
+        // Track this in-flight request
+        const trackedPromise = analysisPromise.then((success) => {
+          inFlightRequests.delete(trackedPromise);
+          if (!success) {
+            consecutiveErrors++;
+          } else {
+            consecutiveErrors = 0;
+          }
+          return success;
+        }).catch(() => {
+          inFlightRequests.delete(trackedPromise);
           consecutiveErrors++;
+          return false;
+        });
+        inFlightRequests.add(trackedPromise);
+
+        // Brief pause — but much shorter than before since we're pipelining
+        if (consecutiveErrors > 0) {
           const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
           console.warn(`[DGX] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
           await new Promise((r) => setTimeout(r, backoff));
         } else {
-          consecutiveErrors = 0;
           await new Promise((r) => setTimeout(r, BASE_DELAY_MS));
         }
 
@@ -489,7 +555,13 @@ export default function App() {
         }
       }
     }
-  }, [captureFrame, analyzeFrameChunk, analyzeDgxBatch]);
+
+    // Wait for any remaining in-flight requests to complete
+    if (inFlightRequests.size > 0) {
+      console.log(`[DGX] Waiting for ${inFlightRequests.size} in-flight requests...`);
+      await Promise.allSettled([...inFlightRequests]);
+    }
+  }, [captureFrame, analyzeFrameChunk, analyzeDgxBatch, analyzeDgxParallel]);
 
   const canStartMonitoring =
     (policy.rules.length > 0 || policy.custom_prompt.trim().length > 0) &&

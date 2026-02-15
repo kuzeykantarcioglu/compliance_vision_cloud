@@ -97,6 +97,25 @@ export async function analyzeFrameBatch(
   }
 }
 
+/** DGX parallel batch analysis: send multiple frame batches concurrently for maximum speed. */
+export async function analyzeFrameBatchParallel(
+  batches: string[][],
+  policy: Policy,
+  maxConcurrent: number = 3,
+): Promise<AnalyzeResponse> {
+  try {
+    const res = await api.post<AnalyzeResponse>("/analyze/frame/parallel", {
+      batches,
+      policy_json: JSON.stringify(policy),
+      max_concurrent: maxConcurrent,
+    });
+    return res.data;
+  } catch (err: any) {
+    const msg = err.response?.data?.detail || err.message || "Unknown error";
+    return { status: "error", report: null, error: msg };
+  }
+}
+
 export async function healthCheck(): Promise<{ status: string; openai_key_set: boolean; dgx?: { status: string; url?: string; error?: string } }> {
   const res = await api.get("/health");
   return res.data;
