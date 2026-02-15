@@ -9,16 +9,16 @@ Results are merged into the final report by the router.
 """
 
 import json
-from openai import AsyncOpenAI
+import logging
 
-from backend.core.config import OPENAI_API_KEY
+from backend.core.config import openai_client as client
 from backend.models.schemas import (
     PolicyRule,
     TranscriptResult,
     Verdict,
 )
 
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+logger = logging.getLogger(__name__)
 
 SPEECH_SYSTEM_PROMPT = """You are an expert audio/speech compliance evaluator.
 
@@ -110,7 +110,10 @@ async def evaluate_speech(
     if not speech_rules:
         return []
 
+    logger.info(f"Evaluating {len(speech_rules)} speech rules against transcript")
+
     if not transcript or not transcript.full_text:
+        logger.warning("No audio transcript available — marking all speech rules as non-compliant")
         # No transcript available — mark all speech rules as non-compliant
         return [
             Verdict(
@@ -156,6 +159,7 @@ Evaluate each speech rule against this transcript. Be precise — count exact ph
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
+        logger.error(f"Failed to parse speech evaluation JSON from LLM: {raw[:200]}")
         return [
             Verdict(
                 rule_type="speech",
@@ -170,6 +174,7 @@ Evaluate each speech rule against this transcript. Be precise — count exact ph
 
     verdicts = []
     for v in data.get("verdicts", []):
+        logger.info(f"  Speech rule '{v.get('rule_description', '')[:50]}': {'COMPLIANT' if v.get('compliant') else 'NON-COMPLIANT'}")
         verdicts.append(Verdict(
             rule_type=v.get("rule_type", "speech"),
             rule_description=v.get("rule_description", ""),

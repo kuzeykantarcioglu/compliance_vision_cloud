@@ -25,8 +25,10 @@ from backend.models.schemas import KeyframeData, VideoProcessingResult
 
 logger = logging.getLogger(__name__)
 
-MAX_KEYFRAME_WIDTH = 768  # Larger for better VLM detail recognition
-MAX_WEBCAM_FRAMES = 3     # Cap frames per webcam chunk for speed
+MAX_KEYFRAME_WIDTH = 768      # For file uploads — higher detail
+MAX_WEBCAM_WIDTH = 512        # For webcam chunks — speed over detail
+WEBCAM_JPEG_QUALITY = 60      # Lower quality for webcam = smaller base64 = faster upload
+MAX_WEBCAM_FRAMES = 2         # 2 frames is enough for short webcam chunks
 
 
 def resize_and_encode(image_path: str, max_width: int = MAX_KEYFRAME_WIDTH) -> str:
@@ -37,13 +39,13 @@ def resize_and_encode(image_path: str, max_width: int = MAX_KEYFRAME_WIDTH) -> s
     return _encode_frame(img, max_width)
 
 
-def _encode_frame(img, max_width: int = MAX_KEYFRAME_WIDTH) -> str:
+def _encode_frame(img, max_width: int = MAX_KEYFRAME_WIDTH, jpeg_quality: int = 85) -> str:
     """Resize a cv2 frame and return base64 JPEG string."""
     h, w = img.shape[:2]
     if w > max_width:
         scale = max_width / w
         img = cv2.resize(img, (max_width, int(h * scale)), interpolation=cv2.INTER_AREA)
-    _, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    _, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality])
     return base64.b64encode(buffer).decode("utf-8")
 
 
@@ -58,7 +60,10 @@ def _quick_sample(file_path: str, keyframes_dir: str, max_frames: int = MAX_WEBC
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / fps if fps > 0 else 0
 
-    if total_frames <= 0:
+    # If OpenCV can't read (e.g. WebM on some Windows builds), return empty
+    # and let the caller handle conversion. Avoids paying the ffmpeg cost
+    # when OpenCV can handle it natively (Linux, newer Windows).
+    if total_frames <= 0 or not cap.isOpened():
         cap.release()
         return []
 
@@ -93,12 +98,44 @@ def _quick_sample(file_path: str, keyframes_dir: str, max_frames: int = MAX_WEBC
             change_score=0.0,
             trigger="sample",
             keyframe_path=kf_path,
-            image_base64=_encode_frame(frame),
+            image_base64=_encode_frame(frame, max_width=MAX_WEBCAM_WIDTH, jpeg_quality=WEBCAM_JPEG_QUALITY),
         ))
 
     cap.release()
     logger.info(f"Quick sample: {len(keyframes)} frames from {duration:.1f}s video")
     return keyframes
+
+
+def _try_convert_webm(file_path: str) -> str:
+    """Convert WebM to MP4 using ffmpeg. Returns new path, or original on failure."""
+    import subprocess
+    import shutil
+
+    if not file_path.lower().endswith(".webm"):
+        return file_path
+
+    try:
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        ffmpeg_exe = shutil.which("ffmpeg")
+
+    if not ffmpeg_exe:
+        logger.warning("No ffmpeg found — cannot convert WebM")
+        return file_path
+
+    mp4_path = file_path.rsplit(".", 1)[0] + ".mp4"
+    try:
+        subprocess.run(
+            [ffmpeg_exe, "-y", "-i", file_path, "-c:v", "libx264",
+             "-preset", "ultrafast", "-crf", "23", "-an", mp4_path],
+            capture_output=True, timeout=30, check=True,
+        )
+        logger.info(f"Converted WebM → MP4: {mp4_path}")
+        return mp4_path
+    except Exception as e:
+        logger.warning(f"WebM→MP4 conversion failed: {e}")
+        return file_path
 
 
 def process_video(
@@ -123,7 +160,15 @@ def process_video(
 
     if duration < 15.0:
         # --- Short video (webcam chunk): fast interval sampling ---
+        # Try OpenCV directly first (avoids ffmpeg conversion overhead)
         keyframes = _quick_sample(file_path, vid_keyframes_dir)
+        # Fallback: if OpenCV couldn't read it (e.g. WebM on Windows), convert first
+        if not keyframes and file_path.lower().endswith(".webm"):
+            logger.info("OpenCV couldn't read WebM, converting to MP4...")
+            converted = _try_convert_webm(file_path)
+            if converted != file_path:
+                video_id = generate_video_id(converted)
+                keyframes = _quick_sample(converted, vid_keyframes_dir)
     else:
         # --- Long video (file upload): full change detection ---
         events = detect_significant_changes(

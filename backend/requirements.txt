@@ -5,3 +5,9 @@ openai
 opencv-python-headless
 numpy
 python-multipart
+httpx
+requests
+celery[redis]
+redis>=6.4.0
+websockets
+setuptools  # Required for Python 3.14+ (distutils removed)

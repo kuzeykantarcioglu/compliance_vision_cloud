@@ -4,7 +4,8 @@ Data flows:  Policy + Video → FrameObservation[] → Verdict[] → Report
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
+from datetime import datetime
 
 
 # ---------------------------------------------------------------------------
@@ -24,13 +25,29 @@ class PolicyRule(BaseModel):
         default="high",
         description='Impact level: "low", "medium", "high", "critical"',
     )
+    
+    # Dual-mode compliance fields
+    mode: str = Field(
+        default="incident",
+        description='Compliance mode: "incident" (always alert) or "checklist" (check once, remember)',
+    )
+    validity_duration: Optional[int] = Field(
+        default=None,
+        description='For checklist mode: how long (in seconds) compliance remains valid after being observed. None = forever.',
+    )
+    recheck_prompt: Optional[str] = Field(
+        default=None,
+        description='Message to show when checklist item expires and needs re-verification',
+    )
+    
+    # Legacy frequency fields (kept for compatibility)
     frequency: str = Field(
         default="always",
-        description='How often compliance must be observed: "always" (every frame), "at_least_once", "at_least_n"',
+        description='[DEPRECATED - use mode instead] How often compliance must be observed',
     )
     frequency_count: int = Field(
         default=1,
-        description='Number of times compliance must be observed (used when frequency == "at_least_n")',
+        description='[DEPRECATED] Number of times compliance must be observed',
     )
 
 
@@ -128,7 +145,52 @@ class Verdict(BaseModel):
         default=None,
         description="When the violation was first observed (seconds)",
     )
+    # New fields for dual-mode
+    mode: str = Field(
+        default="incident",
+        description='Mode that generated this verdict: "incident" or "checklist"',
+    )
+    checklist_status: Optional[str] = Field(
+        default=None,
+        description='For checklist items: "pending", "compliant", "expired"',
+    )
+    expires_at: Optional[float] = Field(
+        default=None,
+        description='For checklist items: when compliance expires (timestamp)',
+    )
 
+
+# ---------------------------------------------------------------------------
+# Compliance State Tracking (for checklist mode)
+# ---------------------------------------------------------------------------
+
+class ChecklistState(BaseModel):
+    """Tracks compliance state for a checklist-mode rule."""
+    rule_id: str = Field(..., description="Unique identifier for the rule")
+    person_id: str = Field(..., description="Person this state applies to")
+    status: Literal["pending", "compliant", "expired"] = Field(
+        default="pending",
+        description="Current compliance status",
+    )
+    last_verified: Optional[datetime] = Field(
+        default=None,
+        description="When compliance was last verified",
+    )
+    expires_at: Optional[datetime] = Field(
+        default=None,
+        description="When compliance expires (if validity_duration set)",
+    )
+    
+class ChecklistItem(BaseModel):
+    """A single item in the compliance checklist UI."""
+    rule: PolicyRule
+    status: Literal["pending", "compliant", "expired"]
+    last_verified: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    time_remaining: Optional[int] = Field(
+        default=None,
+        description="Seconds until expiration (for UI countdown)",
+    )
 
 # ---------------------------------------------------------------------------
 # Whisper transcript
@@ -207,6 +269,20 @@ class AnalyzeResponse(BaseModel):
     status: str = Field(..., description='"complete" or "error"')
     report: Optional[Report] = None
     error: Optional[str] = None
+
+
+class FrameAnalyzeRequest(BaseModel):
+    """Single webcam frame for real-time monitoring (no video file needed)."""
+    image_base64: str = Field(default="", description="Base64-encoded JPEG of a single webcam frame")
+    policy_json: str = Field(..., description="JSON-stringified Policy object")
+    provider: str = Field(
+        default="openai",
+        description='AI provider to use: "openai" or "dgx"',
+    )
+    frames: list[str] = Field(
+        default=[],
+        description='For DGX batch mode: array of base64-encoded JPEG frames captured over ~3 seconds at 4fps',
+    )
 
 
 # ---------------------------------------------------------------------------

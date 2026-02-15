@@ -2,11 +2,13 @@
 
 POST /analyze/upload   → Video → change detection → keyframes (for testing)
 POST /analyze/         → Video + Policy → change detection → VLM + Whisper → policy eval → Report
+POST /analyze/frame    → Single JPEG frame + Policy → compliance report (real-time webcam)
 """
 
 import os
 import json
 import time
+import uuid
 import asyncio
 import shutil
 import logging
@@ -15,12 +17,16 @@ from fastapi import APIRouter, UploadFile, HTTPException, Request, Depends
 from starlette.datastructures import FormData
 
 from backend.core.config import UPLOAD_DIR, KEYFRAMES_DIR
-from backend.models.schemas import Policy, PolicyRule, AnalyzeResponse, Report, Verdict
+from backend.models.schemas import (
+    Policy, PolicyRule, AnalyzeResponse, Report, Verdict,
+    KeyframeData, FrameAnalyzeRequest,
+)
 from backend.services.video import process_video
 from backend.services.vlm import analyze_frames
 from backend.services.policy import evaluate_and_report, analyze_and_evaluate_combined
 from backend.services.whisper import transcribe_video
 from backend.services.speech_policy import evaluate_speech
+from backend.services.dgx import analyze_frame_dgx
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 logger = logging.getLogger(__name__)
@@ -71,11 +77,22 @@ def _assign_person_thumbnails(report: Report) -> None:
 
 
 def _save_upload(video: UploadFile) -> str:
-    """Save uploaded video to disk, return file path."""
+    """Save uploaded video to disk, return file path.
+
+    WebM→MP4 conversion is now handled lazily by process_video() only when
+    OpenCV can't read the file directly — saves 1-3s per webcam chunk on
+    systems where OpenCV supports WebM natively.
+    """
+    logger.info(f"📥 Received upload: filename={video.filename}, content_type={video.content_type}")
+
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     file_path = os.path.join(UPLOAD_DIR, video.filename or "upload.mp4")
     with open(file_path, "wb") as f:
         shutil.copyfileobj(video.file, f)
+
+    file_size_kb = os.path.getsize(file_path) / 1024
+    logger.info(f"💾 Saved to disk: {file_path} ({file_size_kb:.1f} KB)")
+
     return file_path
 
 
@@ -133,6 +150,10 @@ async def analyze_video(
 
     Each stage is timed and logged.
     """
+    logger.info("="*60)
+    logger.info("🚀 NEW ANALYSIS REQUEST")
+    logger.info("="*60)
+
     # --- Extract form fields ---
     video: UploadFile = form_data["video"]
     policy_json: str = form_data["policy_json"]
@@ -140,32 +161,44 @@ async def analyze_video(
     # --- Parse inputs ---
     try:
         policy = Policy(**json.loads(policy_json))
+        logger.info(f"📋 Policy: {len(policy.rules)} rules, custom_prompt={'yes' if policy.custom_prompt else 'no'}, audio={'on' if policy.include_audio else 'off'}")
+        for i, rule in enumerate(policy.rules):
+            logger.info(f"   Rule {i+1}: [{rule.type}] {rule.severity} — {rule.description[:80]}")
     except Exception as e:
+        logger.error(f"❌ Invalid policy JSON: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid policy JSON: {e}")
 
     if not video.content_type or not video.content_type.startswith("video/"):
+        logger.error(f"❌ Bad content type: {video.content_type}")
         raise HTTPException(status_code=400, detail=f"Expected video, got {video.content_type}")
 
     if not policy.rules and not policy.custom_prompt:
+        logger.error("❌ No rules or custom prompt provided")
         raise HTTPException(status_code=400, detail="Policy must have at least one rule or a custom prompt.")
 
     file_path = _save_upload(video)
     timings = {}
 
     # --- Stage 1: Frame extraction ---
+    logger.info("─"*40)
+    logger.info("📹 STAGE 1: Frame Extraction")
+    logger.info("─"*40)
     t0 = time.perf_counter()
     try:
         video_result = process_video(file_path=file_path, keyframes_dir=KEYFRAMES_DIR)
     except Exception as e:
+        logger.error(f"❌ Stage 1 FAILED: {e}", exc_info=True)
         return AnalyzeResponse(status="error", error=f"[Stage 1: Frame Extraction] {e}")
     timings["frame_extraction"] = round(time.perf_counter() - t0, 2)
 
     duration = video_result.metadata.get("duration", 0.0)
     logger.info(
-        f"Stage 1 done: {len(video_result.keyframes)} keyframes in {timings['frame_extraction']}s"
+        f"✅ Stage 1 done: {len(video_result.keyframes)} keyframes from {duration:.1f}s video in {timings['frame_extraction']}s"
     )
+    logger.info(f"   Video metadata: {video_result.metadata}")
 
     if not video_result.keyframes:
+        logger.error(f"❌ No keyframes extracted! Video duration={duration:.1f}s, path={file_path}")
         return AnalyzeResponse(
             status="error",
             error="No keyframes extracted from video. The video may be too short or static.",
@@ -197,6 +230,7 @@ async def analyze_video(
                 reference_images=refs,
             )
         except Exception as e:
+            logger.error(f"❌ Combined analysis FAILED: {e}", exc_info=True)
             return AnalyzeResponse(status="error", error=f"[Combined Analysis] {e}")
 
         timings["combined"] = round(time.perf_counter() - t0, 2)
@@ -344,6 +378,97 @@ async def analyze_video(
         f"(extract={timings['frame_extraction']}s, parallel={timings['stage2_parallel']}s, "
         f"eval={timings['policy_evaluation']}s)"
         f" | {len(report.person_summaries)} people tracked"
+    )
+
+    return AnalyzeResponse(status="complete", report=report)
+
+
+# ---------------------------------------------------------------------------
+# Real-time frame analysis (webcam snapshot — no video file)
+# ---------------------------------------------------------------------------
+
+@router.post("/frame", response_model=AnalyzeResponse)
+async def analyze_frame(request: FrameAnalyzeRequest):
+    """Real-time frame analysis: single JPEG + policy → compliance report.
+
+    Ultra-fast path for webcam monitoring. No file I/O, no OpenCV, no ffmpeg.
+    Sends the frame directly to the combined VLM+policy evaluator.
+
+    Supports two providers:
+      - "openai" (default): sends frame to GPT-4o-mini
+      - "dgx": sends frame to NVIDIA DGX Spark (Cosmos + Nemotron)
+    """
+    t0 = time.perf_counter()
+    provider = (request.provider or "openai").lower()
+    logger.info(f"📸 FRAME ANALYSIS REQUEST (provider={provider})")
+
+    # --- Parse policy ---
+    try:
+        policy = Policy(**json.loads(request.policy_json))
+    except Exception as e:
+        logger.error(f"❌ Invalid policy JSON: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid policy JSON: {e}")
+
+    if not policy.rules and not policy.custom_prompt:
+        raise HTTPException(status_code=400, detail="Policy must have at least one rule or a custom prompt.")
+
+    # --- Strip data URI prefix if present (canvas.toDataURL includes it) ---
+    image_b64 = request.image_base64
+    if image_b64.startswith("data:"):
+        image_b64 = image_b64.split(",", 1)[1]
+
+    # --- Route to the selected provider ---
+    if provider == "dgx":
+        # DGX Spark path: send frames to NVIDIA DGX proxy as mp4 video
+        # Use batch frames if provided, otherwise single frame fallback
+        frames_batch = request.frames if request.frames else None
+        try:
+            report = await analyze_frame_dgx(
+                image_base64=image_b64,
+                policy=policy,
+                video_id=f"dgx-frame-{uuid.uuid4().hex[:8]}",
+                frames=frames_batch,
+            )
+        except Exception as e:
+            logger.error(f"❌ DGX frame analysis FAILED: {e}", exc_info=True)
+            return AnalyzeResponse(status="error", error=f"[DGX Frame Analysis] {e}")
+    else:
+        # OpenAI path (default): send to GPT-4o-mini
+        keyframe = KeyframeData(
+            timestamp=0.0,
+            frame_number=0,
+            change_score=1.0,
+            trigger="webcam_frame",
+            keyframe_path="",
+            image_base64=image_b64,
+        )
+
+        enabled_refs = policy.enabled_reference_ids or []
+        refs = (
+            [r for r in policy.reference_images if getattr(r, "id", None) and r.id in enabled_refs]
+            if enabled_refs else []
+        )
+
+        try:
+            report = await analyze_and_evaluate_combined(
+                keyframes=[keyframe],
+                policy=policy,
+                video_id=f"frame-{uuid.uuid4().hex[:8]}",
+                video_duration=0.0,
+                prior_context=policy.prior_context,
+                reference_images=refs,
+            )
+        except Exception as e:
+            logger.error(f"❌ Frame analysis FAILED: {e}", exc_info=True)
+            return AnalyzeResponse(status="error", error=f"[Frame Analysis] {e}")
+
+    _assign_person_thumbnails(report)
+
+    elapsed = time.perf_counter() - t0
+    logger.info(
+        f"📸 Frame analysis ({provider}): {elapsed:.2f}s"
+        f" | {'COMPLIANT' if report.overall_compliant else 'NON-COMPLIANT'}"
+        f" | {len(report.person_summaries)} people"
     )
 
     return AnalyzeResponse(status="complete", report=report)

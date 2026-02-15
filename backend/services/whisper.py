@@ -14,12 +14,9 @@ import subprocess
 import tempfile
 import logging
 
-from openai import AsyncOpenAI
-
-from backend.core.config import OPENAI_API_KEY
+from backend.core.config import openai_client as client
 from backend.models.schemas import TranscriptSegment, TranscriptResult
 
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 logger = logging.getLogger(__name__)
 
 

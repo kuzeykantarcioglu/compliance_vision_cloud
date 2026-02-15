@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { Report, Verdict, FrameObservation, TranscriptResult, PersonSummary } from "../types";
+import DualModeReport from "./DualModeReport";
 
 interface Props {
   report: Report;
@@ -556,74 +557,8 @@ export default function ReportView({ report }: Props) {
         <PeopleTracked people={report.person_summaries} />
       )}
 
-      {/* Incidents with evidence */}
-      {report.incidents.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "var(--color-non-compliant)" }}>
-            <AlertTriangle className="w-4 h-4" />
-            Incidents ({report.incidents.length})
-          </h3>
-          {report.incidents.map((v, i) => {
-            const evidence = findEvidenceFrame(v.timestamp, report.frame_observations);
-            return (
-              <VerdictCard
-                key={`inc-${i}`}
-                verdict={v}
-                evidence={evidence}
-                onViewEvidence={
-                  evidence
-                    ? () => setEvidenceModal({ evidence, verdict: v })
-                    : undefined
-                }
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* All verdicts */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-          All Rule Evaluations ({report.all_verdicts.length})
-        </h3>
-        {report.all_verdicts.map((v, i) => {
-          const evidence = findEvidenceFrame(v.timestamp, report.frame_observations);
-          return (
-            <VerdictCard
-              key={`all-${i}`}
-              verdict={v}
-              evidence={evidence}
-              onViewEvidence={
-                evidence
-                  ? () => setEvidenceModal({ evidence, verdict: v })
-                  : undefined
-              }
-            />
-          );
-        })}
-      </div>
-
-      {/* Recommendations */}
-      {report.recommendations.length > 0 && (
-        <div className="p-4 rounded border"
-          style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <Lightbulb className="w-4 h-4" style={{ color: "var(--color-medium)" }} />
-            <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-              Recommendations
-            </span>
-          </div>
-          <ul className="space-y-1.5">
-            {report.recommendations.map((rec, i) => (
-              <li key={i} className="text-xs flex items-start gap-2"
-                style={{ color: "var(--color-text-dim)" }}>
-                <span style={{ color: "var(--color-medium)" }}>-</span>
-                {rec}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Dual Mode Compliance Report */}
+      <DualModeReport report={report} />
 
       {/* Audio Transcript */}
       {report.transcript && report.transcript.full_text && (

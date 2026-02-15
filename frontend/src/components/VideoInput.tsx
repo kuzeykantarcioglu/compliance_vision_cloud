@@ -29,8 +29,19 @@ export default function VideoInput({
   const [dragOver, setDragOver] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const videoUrl = file ? URL.createObjectURL(file) : null;
+  // Create and cleanup video URL properly
+  useEffect(() => {
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setVideoUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setVideoUrl(null);
+    }
+  }, [file]);
 
   // Start/stop webcam when mode changes
   useEffect(() => {
@@ -67,11 +78,35 @@ export default function VideoInput({
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       setDragOver(false);
+      
+      if (disabled || isUploading) return;
+      
       const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith("video/")) onFileChange(f);
+      if (!f) return;
+      
+      // Check file type
+      if (!f.type.startsWith("video/")) {
+        alert("Please upload a video file (MP4, WebM, MOV, etc.)");
+        return;
+      }
+      
+      // Check file size (max 500MB)
+      const maxSize = 500 * 1024 * 1024; // 500MB
+      if (f.size > maxSize) {
+        alert(`Video file is too large. Maximum size is 500MB. Your file is ${(f.size / 1024 / 1024).toFixed(1)}MB.`);
+        return;
+      }
+      
+      setIsUploading(true);
+      // Small delay to show loading state
+      setTimeout(() => {
+        onFileChange(f);
+        setIsUploading(false);
+      }, 100);
     },
-    [onFileChange]
+    [onFileChange, disabled, isUploading]
   );
 
   const handleModeSwitch = (newMode: InputMode) => {
@@ -126,21 +161,37 @@ export default function VideoInput({
         <>
           {!file ? (
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
+              onDragOver={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation();
+                if (!disabled && !isUploading) setDragOver(true); 
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragOver(false);
+              }}
               onDrop={handleDrop}
-              onClick={() => !disabled && inputRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-3 p-8 rounded border-2 border-dashed cursor-pointer transition-all"
+              onClick={() => !disabled && !isUploading && inputRef.current?.click()}
+              className="flex flex-col items-center justify-center gap-3 p-8 rounded border-2 border-dashed transition-all"
               style={{
                 borderColor: dragOver ? "var(--color-accent)" : "var(--color-border)",
                 background: dragOver ? "rgba(15,23,42,0.04)" : "var(--color-surface-2)",
-                opacity: disabled ? 0.5 : 1,
+                opacity: disabled || isUploading ? 0.5 : 1,
+                cursor: disabled || isUploading ? "not-allowed" : "pointer",
               }}
             >
-              <Upload className="w-8 h-8" style={{ color: "var(--color-text-dim)" }} />
+              {isUploading ? (
+                <div className="animate-pulse">
+                  <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin" 
+                    style={{ borderTopColor: "transparent", color: "var(--color-accent)" }} />
+                </div>
+              ) : (
+                <Upload className="w-8 h-8" style={{ color: "var(--color-text-dim)" }} />
+              )}
               <div className="text-center">
                 <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-                  Drop video here or click to browse
+                  {isUploading ? "Processing video..." : "Drop video here or click to browse"}
                 </p>
                 <p className="text-xs mt-1" style={{ color: "var(--color-text-dim)" }}>
                   MP4, WebM, MOV — any length
@@ -151,16 +202,44 @@ export default function VideoInput({
                 type="file"
                 accept="video/*"
                 className="hidden"
+                disabled={disabled || isUploading}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) onFileChange(f);
+                  if (!f) return;
+                  
+                  // Check file size (max 500MB)
+                  const maxSize = 500 * 1024 * 1024; // 500MB
+                  if (f.size > maxSize) {
+                    alert(`Video file is too large. Maximum size is 500MB. Your file is ${(f.size / 1024 / 1024).toFixed(1)}MB.`);
+                    if (inputRef.current) inputRef.current.value = '';
+                    return;
+                  }
+                  
+                  setIsUploading(true);
+                  // Small delay to show loading state
+                  setTimeout(() => {
+                    onFileChange(f);
+                    setIsUploading(false);
+                    // Reset input value to allow re-selecting same file
+                    if (inputRef.current) inputRef.current.value = '';
+                  }, 100);
                 }}
               />
             </div>
           ) : (
             <div className="rounded overflow-hidden border"
               style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
-              <video src={videoUrl!} controls className="w-full max-h-48 object-contain bg-black" />
+              {videoUrl && (
+                <video 
+                  src={videoUrl} 
+                  controls 
+                  className="w-full max-h-48 object-contain bg-black" 
+                  onError={() => {
+                    console.error('Video playback error');
+                    alert('Unable to play this video file. Please try a different format.');
+                  }}
+                />
+              )}
               <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   <Video className="w-4 h-4" style={{ color: "var(--color-accent)" }} />
