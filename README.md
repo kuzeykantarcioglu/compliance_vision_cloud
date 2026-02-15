@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎥 Compliance Vision
+# 🕵️‍♂️ Agent 00Vision
 
 ### AI-Powered Video Compliance Monitoring Platform
 
@@ -33,30 +33,34 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/kuzeykantarcioglu/compliance_vision_cloud.git
-cd compliance_vision_cloud
+git clone https://github.com/kuzeykantarcioglu/treehacks2026.git
+cd treehacks2026
 
 # Set up environment
-cp .env.example .env
-echo "OPENAI_API_KEY=sk-your-key-here" >> .env
+echo "OPENAI_API_KEY=sk-your-key-here" > .env
 
-# Install everything
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# Install backend dependencies
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r backend/requirements.txt
+
+# Install frontend dependencies
 cd frontend && npm install && cd ..
 
-# Start the app (2 terminals minimum)
+# Start the app (2 terminals needed)
 
-# Terminal 1: Backend API (port 8082)
-uvicorn backend.main:app --reload --port 8082
+# Terminal 1: Backend API (port 8000)
+PYTHONPATH=/path/to/treehacks2026 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2: Frontend
 cd frontend && npm run dev
 
 # Optional: For async features (Redis + Celery)
-# Terminal 3: Start Redis & workers
-./start-services.sh  # Only if Redis is installed
+# Terminal 3: Start Redis
+redis-server
+
+# Terminal 4: Start Celery worker
+celery -A backend.services.celery_app worker --loglevel=info
 ```
 
 🎉 **Open http://localhost:5173** — You're ready to go!
