@@ -446,8 +446,8 @@ async function sendForAnalysis(videoB64) {
 }
 
 /* ─── Handle Analysis Report ─────────────────────────────── */
-function handleReport(report) {
-    state.clipsAnalyzed++;
+function handleReport(report, { addToHistory = true } = {}) {
+    if (addToHistory) state.clipsAnalyzed++;
 
     // Try to parse the model's content from the raw DGX response
     let parsed = null;
@@ -481,11 +481,11 @@ function handleReport(report) {
                 }
             });
         }
-        // For violation-based responses
-        if (report.violation_count > 0) {
-            compliant = false;
-            incidentCount = Math.max(incidentCount, report.violation_count);
-        }
+    }
+    // Always check backend compliance result (outside parsed block)
+    if (report.violation_count > 0) {
+        compliant = false;
+        incidentCount = Math.max(incidentCount, report.violation_count);
     }
 
     // Update stats
@@ -556,9 +556,10 @@ function handleReport(report) {
     el.rawJson.textContent = JSON.stringify(report.raw || report, null, 2);
 
     // Add to history
-    addHistoryItem(report, compliant, parsed);
-
-    toast(compliant ? "Compliant ✓" : `${incidentCount} violation(s) detected`, compliant ? "success" : "error");
+    if (addToHistory) {
+        addHistoryItem(report, compliant, parsed);
+        toast(compliant ? "Compliant ✓" : `${incidentCount} violation(s) detected`, compliant ? "success" : "error");
+    }
 }
 
 /* ─── History ────────────────────────────────────────────── */
@@ -591,7 +592,7 @@ function renderHistory() {
         item.addEventListener("click", () => {
             const idx = parseInt(item.dataset.idx);
             const h = state.history[idx];
-            if (h) handleReport(h.report);
+            if (h) handleReport(h.report, { addToHistory: false });
         });
     });
 }
