@@ -517,6 +517,200 @@ async def analyze_frame_dgx(
 
 
 # ---------------------------------------------------------------------------
+# Parallel / concurrent DGX analysis — fire multiple requests simultaneously
+# ---------------------------------------------------------------------------
+
+def _merge_reports(reports: list[Report], video_id: str, policy: Policy) -> Report:
+    """Merge multiple DGX reports into a single consolidated report.
+
+    Combines verdicts, person summaries, and incidents from parallel sub-batch
+    analyses. Uses worst-case (most restrictive) for overall compliance.
+    """
+    if not reports:
+        return Report(
+            video_id=video_id,
+            summary="No reports to merge.",
+            overall_compliant=True,
+            analyzed_at=datetime.now(timezone.utc).isoformat(),
+            total_frames_analyzed=0,
+            video_duration=0.0,
+        )
+
+    if len(reports) == 1:
+        return reports[0]
+
+    # Merge all verdicts — deduplicate by rule_description, keep worst result
+    verdict_map: dict[str, Verdict] = {}
+    all_incidents = []
+    all_people: dict[str, PersonSummary] = {}
+    total_frames = 0
+
+    for report in reports:
+        total_frames += report.total_frames_analyzed
+
+        for verdict in report.all_verdicts:
+            existing = verdict_map.get(verdict.rule_description)
+            if existing is None:
+                verdict_map[verdict.rule_description] = verdict
+            elif not verdict.compliant and existing.compliant:
+                # Worse result takes precedence
+                verdict_map[verdict.rule_description] = verdict
+
+        for person in report.person_summaries:
+            existing_person = all_people.get(person.person_id)
+            if existing_person is None:
+                all_people[person.person_id] = person
+            else:
+                # Merge: keep worst compliance, union violations
+                if not person.compliant:
+                    existing_person.compliant = False
+                existing_person.violations = list(
+                    set(existing_person.violations) | set(person.violations)
+                )
+                existing_person.frames_seen += person.frames_seen
+
+    merged_verdicts = list(verdict_map.values())
+    merged_incidents = [v for v in merged_verdicts if not v.compliant]
+    overall_compliant = all(v.compliant for v in merged_verdicts) if merged_verdicts else True
+
+    # Build summary
+    n_violations = len(merged_incidents)
+    n_people = len(all_people)
+    if n_violations == 0:
+        summary = f"All rules compliant across {len(reports)} parallel analyses. {n_people} people detected."
+    else:
+        summary = f"{n_violations} violation(s) detected across {len(reports)} parallel analyses. {n_people} people detected."
+
+    recommendations = []
+    for v in merged_incidents[:5]:
+        recommendations.append(f"Address: {v.reason}")
+    if not recommendations:
+        recommendations.append("All rules compliant per DGX analysis.")
+
+    return Report(
+        video_id=video_id,
+        summary=summary,
+        overall_compliant=overall_compliant,
+        incidents=merged_incidents,
+        all_verdicts=merged_verdicts,
+        recommendations=recommendations,
+        frame_observations=[],
+        person_summaries=list(all_people.values()),
+        analyzed_at=datetime.now(timezone.utc).isoformat(),
+        total_frames_analyzed=total_frames,
+        video_duration=0.0,
+    )
+
+
+async def analyze_frames_dgx_parallel(
+    frames: list[str],
+    policy: Policy,
+    video_id: str | None = None,
+    max_concurrent: int = 3,
+    chunk_size: int = 4,
+) -> Report:
+    """Send frames to DGX Spark in parallel sub-batches for maximum speed.
+
+    Splits the frame buffer into chunks and fires concurrent DGX requests.
+    Each chunk is converted to its own mp4 clip and sent independently.
+    Results are merged into a single consolidated report.
+
+    Args:
+        frames: List of base64-encoded JPEG frames.
+        policy: Compliance policy with rules to evaluate.
+        video_id: Optional ID for the report.
+        max_concurrent: Maximum number of concurrent DGX requests (default 3).
+        chunk_size: Frames per sub-batch (default 4, ~1 second of video).
+
+    Returns:
+        Merged Report from all parallel analyses.
+    """
+    import time as _time
+
+    if not video_id:
+        video_id = f"dgx-parallel-{uuid.uuid4().hex[:8]}"
+
+    if not frames:
+        return Report(
+            video_id=video_id,
+            summary="No frames provided.",
+            overall_compliant=True,
+            analyzed_at=datetime.now(timezone.utc).isoformat(),
+            total_frames_analyzed=0,
+            video_duration=0.0,
+        )
+
+    # Split frames into chunks
+    chunks = [frames[i:i + chunk_size] for i in range(0, len(frames), chunk_size)]
+
+    # Limit concurrency
+    if len(chunks) > max_concurrent:
+        # Evenly sample chunks to fit within max_concurrent
+        step = len(chunks) / max_concurrent
+        sampled = [chunks[int(i * step)] for i in range(max_concurrent)]
+        chunks = sampled
+
+    logger.info(
+        f"🚀 DGX PARALLEL: {len(frames)} frames → {len(chunks)} concurrent requests "
+        f"(chunk_size={chunk_size}, max_concurrent={max_concurrent})"
+    )
+
+    t0 = _time.perf_counter()
+
+    # Create async tasks for each chunk
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def _analyze_chunk(chunk_frames: list[str], chunk_idx: int) -> Report:
+        async with semaphore:
+            chunk_id = f"{video_id}-chunk{chunk_idx}"
+            logger.info(f"  🔄 Chunk {chunk_idx}: {len(chunk_frames)} frames")
+            return await analyze_frame_dgx(
+                image_base64="",
+                policy=policy,
+                video_id=chunk_id,
+                frames=chunk_frames,
+            )
+
+    # Fire all chunks concurrently
+    tasks = [_analyze_chunk(chunk, i) for i, chunk in enumerate(chunks)]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    t1 = _time.perf_counter()
+
+    # Collect successful reports, log errors
+    successful_reports = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            logger.error(f"  ❌ Chunk {i} failed: {result}")
+        elif isinstance(result, Report):
+            successful_reports.append(result)
+        else:
+            logger.warning(f"  ⚠️ Chunk {i} returned unexpected type: {type(result)}")
+
+    if not successful_reports:
+        return Report(
+            video_id=video_id,
+            summary="All parallel DGX requests failed.",
+            overall_compliant=False,
+            analyzed_at=datetime.now(timezone.utc).isoformat(),
+            total_frames_analyzed=len(frames),
+            video_duration=0.0,
+        )
+
+    # Merge all reports
+    merged = _merge_reports(successful_reports, video_id, policy)
+
+    logger.info(
+        f"🏁 DGX PARALLEL complete: {len(successful_reports)}/{len(chunks)} succeeded "
+        f"in {t1 - t0:.1f}s total "
+        f"| {'COMPLIANT' if merged.overall_compliant else 'NON-COMPLIANT'}"
+        f" | {len(merged.person_summaries)} people | {len(merged.incidents)} incidents"
+    )
+
+    return merged
+
+
+# ---------------------------------------------------------------------------
 # Background DGX health probe — never blocks /health endpoint
 # ---------------------------------------------------------------------------
 _dgx_health_cache: dict = {"status": "checking"}
