@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance Vision</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- ─── Header ──────────────────────────────────────────── -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo">
+                    <svg class="logo-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span class="logo-text">Compliance Vision</span>
+                </div>
+            </div>
+            <nav class="header-nav">
+                <button class="nav-btn active" data-page="dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Dashboard
+                </button>
+                <button class="nav-btn" data-page="settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Settings
+                </button>
+            </nav>
+            <div class="header-right">
+                <div class="connection-badge" id="connectionBadge">
+                    <span class="conn-dot"></span>
+                    <span class="conn-text">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ═══════════ PAGE: Dashboard ═══════════ -->
+        <main class="page active" id="page-dashboard">
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-icon compliant">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Compliance Status</span>
+                        <span class="stat-card-value" id="complianceStatus">---</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon incidents">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Total Incidents</span>
+                        <span class="stat-card-value" id="totalIncidents">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon clips">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Clips Analyzed</span>
+                        <span class="stat-card-value" id="clipsAnalyzed">0</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon timer">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Session Time</span>
+                        <span class="stat-card-value mono" id="sessionTime">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Grid -->
+            <div class="dashboard-grid">
+                <!-- Left: Video + Controls + Pipeline -->
+                <div class="dash-col-left">
+                    <div class="card video-card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                                Live Feed
+                            </h2>
+                            <div class="card-actions">
+                                <button class="btn btn-ghost btn-xs" id="btnUploadVideo">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    Upload
+                                </button>
+                                <input type="file" id="fileInput" accept="video/*" style="display:none">
+                            </div>
+                        </div>
+                        <div class="video-wrapper" id="videoWrapper">
+                            <video id="webcamVideo" autoplay muted playsinline></video>
+                            <video id="uploadPreview" muted playsinline loop style="display:none; width:100%; height:100%; object-fit:cover;"></video>
+                            <canvas id="captureCanvas" style="display:none;"></canvas>
+                            <div class="video-overlay" id="videoOverlay">
+                                <div class="overlay-tl">
+                                    <span class="rec-badge" id="recBadge"><span class="rec-dot"></span> REC</span>
+                                </div>
+                                <div class="overlay-tr">
+                                    <span class="clip-badge" id="clipBadge">Clip #0</span>
+                                </div>
+                            </div>
+                            <div class="video-placeholder" id="videoPlaceholder">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                <p>Start camera to begin</p>
+                            </div>
+                        </div>
+                        <div class="video-controls">
+                            <button class="btn btn-primary btn-sm" id="btnCamera">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                Start Camera
+                            </button>
+                            <button class="btn btn-success btn-sm" id="btnMonitor" disabled>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                                Start Monitoring
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="btnCapture" disabled>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                Capture
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Pipeline -->
+                    <div class="card pipeline-card">
+                        <h3 class="pipeline-title">Pipeline Progress</h3>
+                        <div class="pipeline-steps" id="pipelineSteps">
+                            <div class="p-step idle" data-step="recording">
+                                <span class="p-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span>
+                                <span class="p-label">Recording Clip</span>
+                            </div>
+                            <div class="p-step idle" data-step="converting">
+                                <span class="p-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+                                <span class="p-label">Converting Video</span>
+                            </div>
+                            <div class="p-step idle" data-step="uploading">
+                                <span class="p-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                                <span class="p-label">Uploading to DGX</span>
+                            </div>
+                            <div class="p-step idle" data-step="analyzing">
+                                <span class="p-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                                <span class="p-label">VLM Analysis</span>
+                            </div>
+                            <div class="p-step idle" data-step="complete">
+                                <span class="p-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+                                <span class="p-label">Report Ready</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Results + History -->
+                <div class="dash-col-right">
+                    <div class="card result-card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                Latest Report
+                            </h2>
+                            <span class="result-ts" id="resultTs"></span>
+                        </div>
+                        <div class="result-body">
+                            <div class="result-empty" id="resultEmpty">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <p>No reports yet</p>
+                                <span class="muted">Start monitoring to see results</span>
+                            </div>
+                            <div class="result-content" id="resultContent" style="display:none">
+                                <div class="result-status-row">
+                                    <span class="result-badge" id="resultBadge">COMPLIANT</span>
+                                    <span class="result-people" id="resultPeople"></span>
+                                </div>
+                                <div id="resultDetails"></div>
+                                <div class="raw-toggle">
+                                    <button class="btn btn-ghost btn-xs" id="btnRawToggle">Show Raw JSON</button>
+                                </div>
+                                <pre class="raw-json" id="rawJson" style="display:none"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card history-card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                History
+                            </h2>
+                            <button class="btn btn-ghost btn-xs" id="btnClearHistory">Clear</button>
+                        </div>
+                        <div class="history-list" id="historyList">
+                            <div class="empty-hint"><span class="muted">Results appear here during monitoring</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ═══════════ PAGE: Settings ═══════════ -->
+        <main class="page" id="page-settings">
+            <div class="settings-layout">
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                    <p class="muted">Configure DGX connection, model parameters, and analysis prompt.</p>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="card settings-card span-full">
+                        <h3 class="card-title-sm">AI Provider</h3>
+                        <div class="card-body">
+                            <div class="provider-selector">
+                                <label class="provider-option" id="providerLocal">
+                                    <input type="radio" name="aiProvider" value="local" checked>
+                                    <div class="provider-card">
+                                        <span class="provider-icon">🖥️</span>
+                                        <span class="provider-name">Local DGX</span>
+                                        <span class="provider-desc">Cosmos + Nemotron on NVIDIA DGX</span>
+                                    </div>
+                                </label>
+                                <label class="provider-option" id="providerOpenai">
+                                    <input type="radio" name="aiProvider" value="openai">
+                                    <div class="provider-card">
+                                        <span class="provider-icon">🤖</span>
+                                        <span class="provider-name">OpenAI</span>
+                                        <span class="provider-desc">GPT-4o / GPT-4o-mini Vision API</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card" id="dgxSettingsCard">
+                        <h3 class="card-title-sm">DGX Connection</h3>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Server IP</label>
+                                <input type="text" id="sparkIp" placeholder="10.19.176.53">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Port</label><input type="number" id="proxyPort" placeholder="8001"></div>
+                                <div class="form-group"><label>Endpoint</label><input type="text" id="endpointPath" placeholder="/v1/analyze_frame_sync"></div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" id="btnTestConn">Test Connection</button>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card" id="openaiSettingsCard" style="display:none;">
+                        <h3 class="card-title-sm">OpenAI API</h3>
+                        <div class="card-body">
+                            <div class="form-group"><label>API Key</label><input type="password" id="openaiApiKey" placeholder="sk-..."></div>
+                            <div class="form-group">
+                                <label>Model</label>
+                                <select id="openaiModel">
+                                    <option value="gpt-4o">GPT-4o (best quality)</option>
+                                    <option value="gpt-4o-mini">GPT-4o-mini (faster & cheaper)</option>
+                                    <option value="gpt-4.1">GPT-4.1 (latest)</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1-mini (latest mini)</option>
+                                </select>
+                            </div>
+                            <p class="muted small" style="margin-top:8px;">Extracts frames from video and sends to OpenAI Vision. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#818cf8;">platform.openai.com</a></p>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <h3 class="card-title-sm">Model</h3>
+                        <div class="card-body">
+                            <div class="form-group"><label>Model Path / ID</label><input type="text" id="modelId"></div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Max Tokens</label><input type="number" id="maxTokens" min="64" max="8192" step="64"></div>
+                                <div class="form-group"><label>Temperature</label><input type="number" id="temperature" min="0" max="2" step="0.1"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <h3 class="card-title-sm">Capture</h3>
+                        <div class="card-body">
+                            <div class="form-row">
+                                <div class="form-group"><label>Clip Duration (s)</label><input type="number" id="clipDuration" min="1" max="30"></div>
+                                <div class="form-group"><label>FPS</label><input type="number" id="fps" min="1" max="30"></div>
+                            </div>
+                            <div class="toggle-row">
+                                <div><span class="toggle-label">Continuous Monitoring</span><br><span class="muted small">Auto-capture clips in a loop</span></div>
+                                <label class="toggle"><input type="checkbox" id="autoAnalyze" checked><span class="toggle-slider"></span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <h3 class="card-title-sm">Email Alerts</h3>
+                        <div class="card-body">
+                            <div class="toggle-row" style="margin-bottom:12px;">
+                                <div><span class="toggle-label">Email Alerts</span><br><span class="muted small">Send email on violations via Resend</span></div>
+                                <label class="toggle"><input type="checkbox" id="emailAlertsEnabled"><span class="toggle-slider"></span></label>
+                            </div>
+                            <div class="form-group"><label>Recipient Email</label><input type="email" id="alertEmail" placeholder="userdorukhan@gmail.com"></div>
+                            <div class="form-group"><label>Location Label</label><input type="text" id="locationLabel" placeholder="Stanford University - TreeHacks 2026"></div>
+                            <div class="form-group"><label>Resend API Key</label><input type="password" id="resendApiKey" placeholder="re_xxxxxxxxxx"></div>
+                            <div class="form-group"><label>From Address</label><input type="text" id="emailFrom" placeholder="Compliance Vision <onboarding@resend.dev>"></div>
+                            <p class="muted small" style="margin-top:8px;">Get a free API key at <a href="https://resend.com" target="_blank" style="color:#818cf8;">resend.com</a> &mdash; 100 emails/day free, no setup.</p>
+                            <button class="btn btn-secondary btn-sm" id="btnTestEmail" style="margin-top:10px;">Send Test Email</button>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card span-full">
+                        <h3 class="card-title-sm">Analysis Prompt</h3>
+                        <div class="card-body">
+                            <div class="template-bar">
+                                <span class="muted small">Templates:</span>
+                                <button class="chip" data-template="badge">Badge Detection</button>
+                                <button class="chip" data-template="safety">Safety / PPE</button>
+                                <button class="chip" data-template="crowd">Crowd Monitor</button>
+                                <button class="chip" data-template="general">General</button>
+                            </div>
+                            <div class="form-group"><textarea id="promptText" rows="14" placeholder="Enter prompt..."></textarea></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-footer">
+                    <button class="btn btn-primary" id="btnSaveAll">Save All Settings</button>
+                    <button class="btn btn-ghost" id="btnResetAll">Reset to Defaults</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
