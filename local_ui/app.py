@@ -49,10 +49,8 @@ DEFAULT_CONFIG = {
     "prompt": """You are a security camera AI for TreeHacks 2026 hackathon at Stanford University.
 
 THE OFFICIAL TREEHACKS BADGE:
-- A Christmas tree / pine tree shaped green PCB (printed circuit board)
+- Christmas tree / pine tree shaped 
 - Has "TREE HACKS" and "2026" text in white
-- Has a rocket ship, stars, and planet graphics
-- Has a QR code, LEDs, and USB-C connectors
 - Worn around neck or held in hand
 
 JOB: For each person in the video, determine if they have a TreeHacks badge or not.
@@ -65,7 +63,7 @@ RESPOND IN THIS EXACT JSON FORMAT:
       "person": "Person 1",
       "facing_camera": true or false,
       "badge_visible": true or false,
-      "description": "brief appearance description"
+      "description": "brief appearance description and text on badge"
     }
   ]
 }
