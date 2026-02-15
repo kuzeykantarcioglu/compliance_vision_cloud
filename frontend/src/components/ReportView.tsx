@@ -11,9 +11,10 @@ import {
   Mic,
   X,
   Camera,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
-import type { Report, Verdict, FrameObservation, TranscriptResult } from "../types";
+import type { Report, Verdict, FrameObservation, TranscriptResult, PersonSummary } from "../types";
 
 interface Props {
   report: Report;
@@ -425,6 +426,85 @@ function TranscriptView({ transcript }: { transcript: TranscriptResult }) {
   );
 }
 
+// ---- People Tracked ----
+
+function PeopleTracked({ people }: { people: PersonSummary[] }) {
+  if (people.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 mb-3">
+        <Users className="w-4 h-4" style={{ color: "var(--color-accent)" }} />
+        <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+          People Tracked ({people.length})
+        </span>
+      </div>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+        {people.map((person) => (
+          <div
+            key={person.person_id}
+            className="rounded border overflow-hidden"
+            style={{
+              borderColor: person.compliant ? "var(--color-border)" : "var(--color-non-compliant)" + "40",
+              background: person.compliant ? "var(--color-surface-2)" : "rgba(239,68,68,0.04)",
+            }}
+          >
+            {/* Thumbnail */}
+            {person.thumbnail_base64 && (
+              <img
+                src={`data:image/jpeg;base64,${person.thumbnail_base64}`}
+                alt={person.person_id}
+                className="w-full h-28 object-cover"
+              />
+            )}
+            <div className="p-3 space-y-2">
+              {/* Header: ID + compliance badge */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold truncate" style={{ color: "var(--color-text)" }}>
+                  {person.person_id.replace(/_/g, " ")}
+                </span>
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 uppercase"
+                  style={{
+                    background: person.compliant ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+                    color: person.compliant ? "var(--color-compliant)" : "var(--color-non-compliant)",
+                  }}
+                >
+                  {person.compliant ? "Compliant" : "Violation"}
+                </span>
+              </div>
+
+              {/* Appearance */}
+              <p className="text-[11px] leading-relaxed" style={{ color: "var(--color-text-dim)" }}>
+                {person.appearance}
+              </p>
+
+              {/* Stats row */}
+              <div className="flex gap-3 text-[10px]" style={{ color: "var(--color-text-dim)" }}>
+                <span>{person.frames_seen} frame{person.frames_seen !== 1 ? "s" : ""}</span>
+                <span>{formatTimestamp(person.first_seen)} - {formatTimestamp(person.last_seen)}</span>
+              </div>
+
+              {/* Violations list */}
+              {person.violations.length > 0 && (
+                <div className="space-y-1 pt-1 border-t" style={{ borderColor: "var(--color-border)" }}>
+                  {person.violations.map((v, vi) => (
+                    <div key={vi} className="flex items-start gap-1.5 text-[10px]"
+                      style={{ color: "var(--color-non-compliant)" }}>
+                      <AlertTriangle className="w-2.5 h-2.5 shrink-0 mt-0.5" />
+                      <span>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---- Main Report View ----
 
 export default function ReportView({ report }: Props) {
@@ -470,6 +550,11 @@ export default function ReportView({ report }: Props) {
 
       {/* Summary */}
       <SummaryCard report={report} />
+
+      {/* People Tracked */}
+      {report.person_summaries && report.person_summaries.length > 0 && (
+        <PeopleTracked people={report.person_summaries} />
+      )}
 
       {/* Incidents with evidence */}
       {report.incidents.length > 0 && (

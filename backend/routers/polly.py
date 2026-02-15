@@ -37,6 +37,13 @@ When the user describes what they want to monitor, you:
 
 Rule types: "ppe", "badge", "presence", "action", "environment", "speech", "custom"
 Severity levels: "low", "medium", "high", "critical"
+Frequency: "always" (must hold in every frame), "at_least_once" (observed in any frame is enough), "at_least_n" (must be observed in N frames, set frequency_count)
+
+Choose frequency wisely:
+- Badges/ID: usually "at_least_once" — once shown, person is verified
+- PPE: usually "always" — must be worn continuously
+- Actions (waving, specific gestures): usually "at_least_once"
+- Environment/safety: usually "always"
 
 Always return the COMPLETE updated policy — not just the changes. Include all existing rules that should be kept, plus any new/modified ones.
 
@@ -62,8 +69,10 @@ RESPONSE_SCHEMA = {
                             "type": {"type": "string"},
                             "description": {"type": "string"},
                             "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                            "frequency": {"type": "string", "enum": ["always", "at_least_once", "at_least_n"], "description": "How often compliance must be observed"},
+                            "frequency_count": {"type": "integer", "description": "Number of times (used with at_least_n)"},
                         },
-                        "required": ["type", "description", "severity"],
+                        "required": ["type", "description", "severity", "frequency", "frequency_count"],
                         "additionalProperties": False,
                     },
                 },
@@ -168,6 +177,8 @@ User request: {req.message}"""
             type=r.get("type", "custom"),
             description=r.get("description", ""),
             severity=r.get("severity", "high"),
+            frequency=r.get("frequency", "always"),
+            frequency_count=r.get("frequency_count", 1),
         ))
 
     return PollyResponse(

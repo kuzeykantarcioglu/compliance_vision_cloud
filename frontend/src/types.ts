@@ -4,6 +4,8 @@ export interface PolicyRule {
   type: string;
   description: string;
   severity: "low" | "medium" | "high" | "critical";
+  frequency?: "always" | "at_least_once" | "at_least_n";
+  frequency_count?: number;
 }
 
 export type ReferenceCategory = "people" | "badges" | "objects";
@@ -24,6 +26,14 @@ export interface Policy {
   reference_images: ReferenceImage[];
   /** IDs of references that should be checked. Only these are sent to VLM. Omit/empty = none checked. */
   enabled_reference_ids?: string[];
+  /** Context from prior monitoring chunks about already-satisfied frequency rules. */
+  prior_context?: string;
+}
+
+export interface PersonDetail {
+  person_id: string;
+  appearance: string;
+  details: string;
 }
 
 export interface FrameObservation {
@@ -32,6 +42,7 @@ export interface FrameObservation {
   trigger: string;
   change_score: number;
   image_base64: string;
+  people: PersonDetail[];
 }
 
 export interface Verdict {
@@ -56,6 +67,17 @@ export interface TranscriptResult {
   duration: number;
 }
 
+export interface PersonSummary {
+  person_id: string;
+  appearance: string;
+  first_seen: number;
+  last_seen: number;
+  frames_seen: number;
+  compliant: boolean;
+  violations: string[];
+  thumbnail_base64: string;
+}
+
 export interface Report {
   video_id: string;
   summary: string;
@@ -64,6 +86,7 @@ export interface Report {
   all_verdicts: Verdict[];
   recommendations: string[];
   frame_observations: FrameObservation[];
+  person_summaries: PersonSummary[];
   transcript: TranscriptResult | null;
   analyzed_at: string;
   total_frames_analyzed: number;

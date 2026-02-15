@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from "react";
-import { Scan, ScrollText, Image, Shield, Sparkles } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Scan, ScrollText, Image, Shield, Sparkles, Camera } from "lucide-react";
 import type { ReferenceImage } from "./types";
 import StatusBar from "./components/Header";
+import ThemeToggle, { applyTheme } from "./components/ThemeToggle";
 import VideoInput, { type InputMode } from "./components/VideoInput";
 import PolicyConfig from "./components/PolicyConfig";
 import ReferencesPanel from "./components/ReferencesPanel";
@@ -12,9 +13,35 @@ import LiveReportView from "./components/LiveReportView";
 import { analyzeVideo, healthCheck } from "./api";
 import type { Policy, Report, PipelineStage } from "./types";
 
+// Apply saved theme before first paint to avoid flash
+applyTheme((localStorage.getItem("compliance_vision_theme") || "light") as "light" | "night" | "dark" | "high-contrast");
+
 type LeftTab = "policy" | "references" | "polly";
 
-const CHUNK_DURATION_MS = 8_000;
+const CHUNK_DURATION_MS = 6_000;  // 6s chunks — good balance of context vs speed
+const FIRST_CHUNK_DURATION_MS = 2_000; // 2s first chunk for fast initial result
+const REFS_STORAGE_KEY = "compliance_vision_references";
+
+/** Load saved reference images from localStorage */
+function loadSavedReferences(): ReferenceImage[] {
+  try {
+    const raw = localStorage.getItem(REFS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Save reference images to localStorage */
+function saveReferences(images: ReferenceImage[]) {
+  try {
+    localStorage.setItem(REFS_STORAGE_KEY, JSON.stringify(images));
+  } catch (e) {
+    console.warn("Failed to save references to localStorage (may exceed quota):", e);
+  }
+}
 
 export default function App() {
   const [inputMode, setInputMode] = useState<InputMode>("file");
@@ -36,9 +63,23 @@ export default function App() {
   const streamRef = useRef<MediaStream | null>(null);
   const monitoringRef = useRef(false);
   const sessionIdRef = useRef(0); // incremented each session to discard stale in-flight results
-  const policyRef = useRef<Policy>({ rules: [], custom_prompt: "", include_audio: false, reference_images: [], enabled_reference_ids: [] });
+  const liveReportsRef = useRef<Report[]>([]);
 
-  const [policy, setPolicy] = useState<Policy>({ rules: [], custom_prompt: "", include_audio: false, reference_images: [], enabled_reference_ids: [] });
+  const [policy, setPolicy] = useState<Policy>(() => {
+    const savedRefs = loadSavedReferences();
+    return { rules: [], custom_prompt: "", include_audio: false, reference_images: savedRefs, enabled_reference_ids: [] };
+  });
+  const policyRef = useRef<Policy>(policy);
+
+  // Persist reference images to localStorage whenever they change
+  useEffect(() => {
+    saveReferences(policy.reference_images);
+  }, [policy.reference_images]);
+
+  // Keep liveReportsRef in sync for use in analyzeChunk (avoids stale closure)
+  useEffect(() => {
+    liveReportsRef.current = liveReports;
+  }, [liveReports]);
 
   const handlePolicyChange = useCallback((p: Policy) => {
     setPolicy(p);
@@ -83,7 +124,7 @@ export default function App() {
   // --- Pipelined monitoring: record chunk N+1 while analyzing chunk N ---
 
   /** Record a single webcam chunk. Returns a File or null if session ended. */
-  const recordChunk = useCallback(async (mySession: number): Promise<File | null> => {
+  const recordChunk = useCallback(async (mySession: number, durationMs: number = CHUNK_DURATION_MS): Promise<File | null> => {
     const videoEl = document.querySelector("video[autoplay]") as HTMLVideoElement | null;
     if (!videoEl || !videoEl.srcObject) return null;
     const stream = videoEl.srcObject as MediaStream;
@@ -97,16 +138,80 @@ export default function App() {
     const blob = await new Promise<Blob>((resolve) => {
       recorder.onstop = () => resolve(new Blob(parts, { type: "video/webm" }));
       recorder.start();
-      setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, CHUNK_DURATION_MS);
+      setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, durationMs);
     });
     if (!monitoringRef.current || sessionIdRef.current !== mySession) return null;
     return new File([blob], `chunk-${Date.now()}.webm`, { type: "video/webm" });
   }, []);
 
+  /**
+   * Build prior_context string from accumulated reports.
+   * Tells the LLM which "at least once" rules are already satisfied per person.
+   * Uses person_summaries (per-person compliance) for accurate attribution.
+   */
+  const buildPriorContext = useCallback((reports: Report[]): string => {
+    if (reports.length === 0) return "";
+    const lines: string[] = [];
+
+    // Track which people were compliant in ANY chunk (person-level, from person_summaries)
+    const personCompliant = new Map<string, boolean>();  // person_id → ever compliant
+    const personViolations = new Map<string, Set<string>>();  // person_id → unsatisfied rule descriptions
+
+    for (const r of reports) {
+      for (const ps of r.person_summaries ?? []) {
+        if (ps.compliant) {
+          personCompliant.set(ps.person_id, true);
+        }
+        // Track violations that are NOT yet satisfied
+        if (!ps.compliant) {
+          if (!personViolations.has(ps.person_id)) {
+            personViolations.set(ps.person_id, new Set());
+          }
+          for (const v of ps.violations) {
+            personViolations.get(ps.person_id)?.add(v);
+          }
+        }
+      }
+    }
+
+    // Collect rules that were satisfied (compliant verdict in ANY chunk) — per the whole session
+    const satisfiedRules = new Set<string>();
+    for (const r of reports) {
+      for (const v of r.all_verdicts ?? []) {
+        if (v.compliant) {
+          satisfiedRules.add(v.rule_description);
+        }
+      }
+    }
+
+    // Build context: for each satisfied rule, list which people satisfied it
+    if (satisfiedRules.size > 0) {
+      lines.push("ALREADY SATISFIED RULES (do NOT flag these as violations again):");
+      for (const rule of satisfiedRules) {
+        const whoSatisfied: string[] = [];
+        for (const [pid, isCompliant] of personCompliant) {
+          if (isCompliant) whoSatisfied.push(pid);
+        }
+        lines.push(`  - "${rule}" → SATISFIED by ${whoSatisfied.length > 0 ? whoSatisfied.join(", ") : "at least one person"}`);
+      }
+      lines.push("Mark these rules as COMPLIANT. Do NOT generate incidents for them.");
+    }
+
+    return lines.join("\n");
+  }, []);
+
   /** Upload + analyze a single chunk. Fire-and-forget friendly. */
   const analyzeChunk = useCallback(async (file: File, mySession: number) => {
     setLiveStage("uploading");
-    const result = await analyzeVideo(file, policyRef.current, (s) => {
+
+    // Inject prior_context from accumulated reports into the policy for this chunk
+    const currentPolicy = { ...policyRef.current };
+    const priorCtx = buildPriorContext(liveReportsRef.current);
+    if (priorCtx) {
+      currentPolicy.prior_context = priorCtx;
+    }
+
+    const result = await analyzeVideo(file, currentPolicy, (s) => {
       if (sessionIdRef.current === mySession) setLiveStage(s as PipelineStage);
     });
     if (!monitoringRef.current || sessionIdRef.current !== mySession) return;
@@ -119,29 +224,37 @@ export default function App() {
       setLiveError(result.error || "Chunk analysis failed.");
       setLiveStage("error");
     }
-  }, []);
+  }, [buildPriorContext]);
 
   /**
    * Pipelined loop: overlaps recording and analysis.
    *
-   * Timeline:
-   *   record(8s) ──→ fire analyze ──→ record(8s) ──→ wait prev analyze ──→ fire analyze ──→ ...
-   *                   └── runs in background ──┘
+   * First chunk is shorter (3s) for a fast initial result.
+   * Health check runs in parallel with first chunk recording.
    *
-   * Effective cycle = max(8s record, ~15s analyze) instead of 8s + 15s.
+   * Timeline:
+   *   record(3s) ──→ fire analyze ──→ record(8s) ──→ wait prev ──→ fire analyze ──→ ...
+   *   healthCheck() ──┘ (parallel)     └── runs in background ──┘
    */
   const runMonitoringLoop = useCallback(async () => {
     const mySession = sessionIdRef.current;
-
-    // Warm-start: ping backend to pre-establish HTTP connection + warm any caches
-    try { await healthCheck(); } catch { /* ignore */ }
-
+    let isFirst = true;
     let pendingAnalysis: Promise<void> | null = null;
 
+    // Warm-start health check runs in parallel with first chunk recording (not awaited upfront)
+    const warmup = healthCheck().catch(() => {});
+
     while (monitoringRef.current && sessionIdRef.current === mySession) {
-      // 1. Record chunk (8s of video)
-      const file = await recordChunk(mySession);
+      // 1. Record chunk — first chunk is short for fast initial result
+      const duration = isFirst ? FIRST_CHUNK_DURATION_MS : CHUNK_DURATION_MS;
+      const file = await recordChunk(mySession, duration);
       if (!file || !monitoringRef.current || sessionIdRef.current !== mySession) break;
+
+      // Wait for warmup only on first chunk (should be done by now — ran in parallel)
+      if (isFirst) {
+        await warmup;
+        isFirst = false;
+      }
 
       // 2. If previous analysis is still running, wait for it (max 1 in-flight)
       if (pendingAnalysis) {
@@ -168,6 +281,7 @@ export default function App() {
     setIsMonitoring(true);
     monitoringRef.current = true;
     setLiveReports([]);
+    liveReportsRef.current = [];
     setSessionStart(Date.now());
     setChunksProcessed(0);
     setLiveStage("idle");
@@ -203,13 +317,16 @@ export default function App() {
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 rounded" style={{ background: "var(--color-accent)" }}>
-                <Shield className="w-4 h-4 text-white" />
+                <Shield className="w-4 h-4" style={{ color: "var(--color-bg)" }} />
               </div>
               <span className="text-sm font-bold tracking-tight" style={{ color: "var(--color-text)" }}>
                 Compliance Vision
               </span>
             </div>
-            <StatusBar />
+            <div className="flex items-center gap-2">
+              <StatusBar />
+              <ThemeToggle />
+            </div>
           </div>
 
           {/* Tab bar */}
@@ -248,8 +365,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tab content — scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Tab content — scrollable, no horizontal overflow */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4">
           {leftTab === "polly" ? (
             <PollyChat
               policy={policy}
@@ -346,27 +463,101 @@ export default function App() {
             <ReportView report={report} />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3">
-                <Scan className="w-14 h-14 mx-auto" style={{ color: "var(--color-border)" }} />
-                <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-                  {isFileRunning
-                    ? "Analyzing video..."
-                    : "Upload a video and configure a policy to get started."}
-                </p>
-                {!isFileRunning && (
-                  <p className="text-xs" style={{ color: "var(--color-border)" }}>
-                    The compliance report will appear here.
-                  </p>
+              <div className="text-center space-y-5 max-w-sm mx-auto">
+                {isFileRunning ? (
+                  <>
+                    <div className="relative mx-auto w-16 h-16">
+                      <Scan className="w-16 h-16 animate-pulse-glow" style={{ color: "var(--color-accent)" }} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                        Analyzing video...
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                        Running change detection, VLM analysis, and policy evaluation.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center"
+                      style={{ background: "var(--color-surface-2)", border: "2px dashed var(--color-border)" }}
+                    >
+                      <Scan className="w-9 h-9" style={{ color: "var(--color-border)" }} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-base font-semibold" style={{ color: "var(--color-text)" }}>
+                        Waiting for Analysis
+                      </p>
+                      <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-dim)" }}>
+                        Upload a video and configure your compliance policy on the left, then hit <span className="font-medium" style={{ color: "var(--color-text)" }}>Analyze Video</span> to generate a report.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-4 pt-2">
+                      {[
+                        { icon: "1", text: "Upload video" },
+                        { icon: "2", text: "Set policy" },
+                        { icon: "3", text: "Run analysis" },
+                      ].map((step) => (
+                        <div key={step.icon} className="flex items-center gap-1.5">
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                            style={{ background: "var(--color-surface-2)", color: "var(--color-text-dim)", border: "1px solid var(--color-border)" }}
+                          >
+                            {step.icon}
+                          </span>
+                          <span className="text-[11px]" style={{ color: "var(--color-text-dim)" }}>{step.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
           )
-        ) : (
+        ) : liveReports.length > 0 || isMonitoring ? (
           <LiveReportView
             reports={liveReports}
             isMonitoring={isMonitoring}
             sessionStart={sessionStart}
           />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-5 max-w-sm mx-auto">
+              <div
+                className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center"
+                style={{ background: "var(--color-surface-2)", border: "2px dashed var(--color-border)" }}
+              >
+                <Camera className="w-9 h-9" style={{ color: "var(--color-border)" }} />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-base font-semibold" style={{ color: "var(--color-text)" }}>
+                  Ready to Monitor
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-dim)" }}>
+                  Configure your compliance policy and start webcam monitoring. Live results will stream here in real time.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-4 pt-2">
+                {[
+                  { icon: "1", text: "Set policy" },
+                  { icon: "2", text: "Start webcam" },
+                  { icon: "3", text: "View live" },
+                ].map((step) => (
+                  <div key={step.icon} className="flex items-center gap-1.5">
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={{ background: "var(--color-surface-2)", color: "var(--color-text-dim)", border: "1px solid var(--color-border)" }}
+                    >
+                      {step.icon}
+                    </span>
+                    <span className="text-[11px]" style={{ color: "var(--color-text-dim)" }}>{step.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

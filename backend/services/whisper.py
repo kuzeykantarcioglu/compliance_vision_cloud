@@ -50,11 +50,19 @@ def extract_audio(video_path: str) -> str | None:
             text=True,
             timeout=60,
         )
+        if result.returncode != 0:
+            logger.warning(f"ffmpeg exited with code {result.returncode}: {result.stderr[:500]}")
         # Check if output file has content (some videos have no audio)
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000:
+            logger.info(f"Audio extracted: {os.path.getsize(audio_path)} bytes")
             return audio_path
         else:
-            os.unlink(audio_path)
+            logger.info(
+                f"No usable audio track — file {'exists' if os.path.exists(audio_path) else 'missing'}"
+                f", size={os.path.getsize(audio_path) if os.path.exists(audio_path) else 0}"
+            )
+            if os.path.exists(audio_path):
+                os.unlink(audio_path)
             return None
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         logger.warning(f"Audio extraction failed: {e}")

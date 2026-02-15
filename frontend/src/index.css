@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-:root {
+/* ===== THEME: Light (default) ===== */
+:root,
+[data-theme="light"] {
   --color-bg: #ffffff;
   --color-surface: #f8f9fa;
   --color-surface-2: #f0f1f3;
@@ -19,12 +21,67 @@
   --font-body: "Urbanist", system-ui, -apple-system, sans-serif;
 }
 
+/* ===== THEME: Night ===== */
+[data-theme="night"] {
+  --color-bg: #1a1b2e;
+  --color-surface: #22243a;
+  --color-surface-2: #2a2d47;
+  --color-border: #363a56;
+  --color-text: #e2e4f0;
+  --color-text-dim: #8b8fad;
+  --color-accent: #7c8cf5;
+  --color-accent-hover: #9ba5f8;
+  --color-critical: #f87171;
+  --color-high: #fb923c;
+  --color-medium: #facc15;
+  --color-low: #4ade80;
+  --color-compliant: #4ade80;
+  --color-non-compliant: #f87171;
+}
+
+/* ===== THEME: Dark ===== */
+[data-theme="dark"] {
+  --color-bg: #0f0f0f;
+  --color-surface: #1a1a1a;
+  --color-surface-2: #242424;
+  --color-border: #333333;
+  --color-text: #e5e5e5;
+  --color-text-dim: #888888;
+  --color-accent: #e5e5e5;
+  --color-accent-hover: #ffffff;
+  --color-critical: #ef4444;
+  --color-high: #f97316;
+  --color-medium: #eab308;
+  --color-low: #22c55e;
+  --color-compliant: #22c55e;
+  --color-non-compliant: #ef4444;
+}
+
+/* ===== THEME: High Contrast ===== */
+[data-theme="high-contrast"] {
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-2: #141414;
+  --color-border: #ffffff;
+  --color-text: #ffffff;
+  --color-text-dim: #cccccc;
+  --color-accent: #00e5ff;
+  --color-accent-hover: #4df0ff;
+  --color-critical: #ff1744;
+  --color-high: #ff9100;
+  --color-medium: #ffea00;
+  --color-low: #00e676;
+  --color-compliant: #00e676;
+  --color-non-compliant: #ff1744;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
   margin: 0;
   min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
@@ -59,4 +116,9 @@ body {
 /* Global border-radius override */
 input, select, textarea, button {
   border-radius: 4px;
+}
+
+/* Smooth color transitions for theme switching */
+div, span, p, h1, h2, h3, h4, button, input, select, textarea, a, label {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }

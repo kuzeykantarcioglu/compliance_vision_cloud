@@ -8,9 +8,10 @@ import {
   Eye,
   Mic,
   Camera,
+  Users,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import type { Report, Verdict, TranscriptSegment, FrameObservation } from "../types";
+import type { Report, Verdict, TranscriptSegment, FrameObservation, PersonSummary } from "../types";
 
 interface Props {
   reports: Report[];
@@ -69,14 +70,34 @@ function findNearestFrame(timestamp: number | null, observations: FrameObservati
 export default function LiveReportView({ reports, isMonitoring, sessionStart }: Props) {
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  // Aggregate all incidents across all chunk reports
+  // Build set of rules that were satisfied (compliant) in any chunk
+  const satisfiedRules = new Set<string>();
+  for (const r of reports) {
+    for (const v of r.all_verdicts ?? []) {
+      if (v.compliant) satisfiedRules.add(v.rule_description);
+    }
+  }
+
+  // Aggregate incidents — filter out incidents for rules already satisfied in an earlier chunk
   const allIncidents = reports.flatMap((r, ri) =>
-    r.incidents.map((v) => ({ ...v, chunkIndex: ri }))
+    r.incidents
+      .filter((v) => {
+        // If this rule was satisfied in a PRIOR chunk, skip this incident
+        for (let pi = 0; pi < ri; pi++) {
+          const priorChunk = reports[pi];
+          if (priorChunk.all_verdicts?.some((pv) => pv.compliant && pv.rule_description === v.rule_description)) {
+            return false; // Already satisfied before this chunk
+          }
+        }
+        return true;
+      })
+      .map((v) => ({ ...v, chunkIndex: ri }))
   );
   const allObservations = reports.flatMap((r) => r.frame_observations);
   const totalFrames = reports.reduce((sum, r) => sum + r.total_frames_analyzed, 0);
   const totalDuration = reports.reduce((sum, r) => sum + r.video_duration, 0);
-  const hasAnyNonCompliant = reports.some((r) => !r.overall_compliant);
+  // Overall status: only non-compliant if there are actual filtered incidents
+  const hasAnyNonCompliant = allIncidents.length > 0;
 
   // Aggregate all transcript segments
   const allTranscriptSegments: (TranscriptSegment & { chunkIndex: number })[] = reports.flatMap(
@@ -84,6 +105,48 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
       r.transcript?.segments?.map((seg) => ({ ...seg, chunkIndex: ri })) ?? []
   );
   const hasTranscript = allTranscriptSegments.length > 0;
+
+  // Aggregate person summaries across chunks — merge by person_id
+  // Once a person is compliant in any chunk, they stay compliant (for "at least once" rules)
+  const personMap = new Map<string, PersonSummary>();
+  const personEverCompliant = new Map<string, boolean>();
+  const personSatisfiedViolations = new Map<string, Set<string>>();
+
+  for (const r of reports) {
+    for (const ps of r.person_summaries ?? []) {
+      if (ps.compliant) {
+        personEverCompliant.set(ps.person_id, true);
+        // Track which violation descriptions are now resolved
+        if (!personSatisfiedViolations.has(ps.person_id)) {
+          personSatisfiedViolations.set(ps.person_id, new Set());
+        }
+      }
+
+      const existing = personMap.get(ps.person_id);
+      if (existing) {
+        // Merge: expand time range, sum frames
+        // Compliant if EVER compliant (for frequency rules)
+        const everCompliant = personEverCompliant.get(ps.person_id) || false;
+        // Only keep violations that haven't been resolved
+        const resolved = personSatisfiedViolations.get(ps.person_id) ?? new Set();
+        const mergedViolations = [...new Set([...existing.violations, ...ps.violations])]
+          .filter((v) => !everCompliant); // If ever compliant, clear all violations
+
+        personMap.set(ps.person_id, {
+          ...existing,
+          first_seen: Math.min(existing.first_seen, ps.first_seen),
+          last_seen: Math.max(existing.last_seen, ps.last_seen),
+          frames_seen: existing.frames_seen + ps.frames_seen,
+          compliant: everCompliant || (existing.compliant && ps.compliant),
+          violations: mergedViolations,
+          thumbnail_base64: existing.thumbnail_base64 || ps.thumbnail_base64,
+        });
+      } else {
+        personMap.set(ps.person_id, { ...ps });
+      }
+    }
+  }
+  const aggregatedPeople = Array.from(personMap.values());
 
   // Auto-scroll transcript to bottom when new segments arrive
   useEffect(() => {
@@ -129,7 +192,7 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
     );
   }
 
-  if (reports.length === 0) return null;
+  if (reports.length === 0) return null; // Parent handles the empty/idle state
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -201,6 +264,70 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
         ))}
       </div>
 
+      {/* People Tracked — aggregated across chunks */}
+      {aggregatedPeople.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium flex items-center gap-2"
+            style={{ color: "var(--color-text)" }}>
+            <Users className="w-4 h-4" style={{ color: "var(--color-accent)" }} />
+            People Tracked ({aggregatedPeople.length})
+          </h3>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
+            {aggregatedPeople.map((person) => (
+              <div
+                key={person.person_id}
+                className="rounded border overflow-hidden"
+                style={{
+                  borderColor: person.compliant ? "var(--color-border)" : "var(--color-non-compliant)" + "40",
+                  background: person.compliant ? "var(--color-surface-2)" : "rgba(239,68,68,0.04)",
+                }}
+              >
+                {person.thumbnail_base64 && (
+                  <img
+                    src={`data:image/jpeg;base64,${person.thumbnail_base64}`}
+                    alt={person.person_id}
+                    className="w-full h-20 object-cover"
+                  />
+                )}
+                <div className="p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] font-bold truncate" style={{ color: "var(--color-text)" }}>
+                      {person.person_id.replace(/_/g, " ")}
+                    </span>
+                    <span
+                      className="text-[8px] font-bold px-1 py-0.5 rounded-full shrink-0 uppercase"
+                      style={{
+                        background: person.compliant ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+                        color: person.compliant ? "var(--color-compliant)" : "var(--color-non-compliant)",
+                      }}
+                    >
+                      {person.compliant ? "OK" : "FAIL"}
+                    </span>
+                  </div>
+                  <p className="text-[10px]" style={{ color: "var(--color-text-dim)" }}>
+                    {person.appearance}
+                  </p>
+                  <div className="text-[9px]" style={{ color: "var(--color-text-dim)" }}>
+                    {person.frames_seen} frames | {formatTs(person.first_seen)}-{formatTs(person.last_seen)}
+                  </div>
+                  {person.violations.length > 0 && (
+                    <div className="space-y-0.5 pt-1 border-t" style={{ borderColor: "var(--color-border)" }}>
+                      {person.violations.map((v, vi) => (
+                        <div key={vi} className="flex items-start gap-1 text-[9px]"
+                          style={{ color: "var(--color-non-compliant)" }}>
+                          <AlertTriangle className="w-2 h-2 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Incident feed — newest first, with evidence thumbnails */}
       {allIncidents.length > 0 && (
         <div className="space-y-2">
@@ -217,8 +344,8 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
                 key={i}
                 className="flex gap-3 p-3 rounded border animate-slide-up"
                 style={{
-                  borderColor: SEVERITY_COLORS[v.severity] + "40",
-                  background: SEVERITY_BG[v.severity],
+                  borderColor: "var(--color-border)",
+                  background: "var(--color-surface-2)",
                 }}
               >
                 {/* Evidence thumbnail */}
@@ -227,22 +354,19 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
                     src={`data:image/jpeg;base64,${evidence.image_base64}`}
                     alt="Evidence"
                     className="w-16 h-12 rounded object-cover shrink-0 border"
-                    style={{ borderColor: SEVERITY_COLORS[v.severity] + "60" }}
+                    style={{ borderColor: "var(--color-border)" }}
                   />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase"
-                      style={{
-                        background: SEVERITY_COLORS[v.severity] + "20",
-                        color: SEVERITY_COLORS[v.severity],
-                      }}
+                      className="text-[10px] font-bold uppercase"
+                      style={{ color: SEVERITY_COLORS[v.severity] }}
                     >
                       {v.severity}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded uppercase"
-                      style={{ background: "var(--color-surface)", color: "var(--color-text-dim)" }}>
+                    <span className="text-[10px] uppercase"
+                      style={{ color: "var(--color-text-dim)" }}>
                       chunk #{v.chunkIndex + 1}
                     </span>
                     {evidence && (
@@ -301,39 +425,57 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
         </div>
       )}
 
-      {/* Latest chunk report summary */}
+      {/* Chunk report timeline — chronological order */}
       {reports.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-            Chunk Reports ({reports.length})
+            Chunk Timeline ({reports.length})
           </h3>
-          {[...reports].reverse().map((r, i) => (
-            <div
-              key={i}
-              className="p-3 rounded border"
-              style={{
-                borderColor: r.overall_compliant ? "var(--color-border)" : "var(--color-non-compliant)" + "30",
-                background: r.overall_compliant ? "var(--color-surface-2)" : "rgba(239,68,68,0.04)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {r.overall_compliant ? (
-                  <ShieldCheck className="w-3.5 h-3.5" style={{ color: "var(--color-compliant)" }} />
-                ) : (
-                  <ShieldAlert className="w-3.5 h-3.5" style={{ color: "var(--color-non-compliant)" }} />
-                )}
-                <span className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
-                  Chunk #{reports.length - i}
-                </span>
-                <span className="text-[10px]" style={{ color: "var(--color-text-dim)" }}>
-                  {r.incidents.length} incident{r.incidents.length !== 1 ? "s" : ""} | {r.total_frames_analyzed} frames
-                </span>
+          {reports.map((r, i) => {
+            // Check if this chunk's incidents are all resolved by later compliant chunks
+            const effectiveIncidents = r.incidents.filter((v) => {
+              for (let pi = 0; pi < i; pi++) {
+                if (reports[pi].all_verdicts?.some((pv) => pv.compliant && pv.rule_description === v.rule_description)) {
+                  return false;
+                }
+              }
+              return true;
+            });
+            const effectiveCompliant = effectiveIncidents.length === 0;
+
+            return (
+              <div
+                key={i}
+                className="p-3 rounded border"
+                style={{
+                  borderColor: effectiveCompliant ? "var(--color-border)" : "var(--color-non-compliant)" + "30",
+                  background: effectiveCompliant ? "var(--color-surface-2)" : "rgba(239,68,68,0.04)",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {effectiveCompliant ? (
+                    <ShieldCheck className="w-3.5 h-3.5" style={{ color: "var(--color-compliant)" }} />
+                  ) : (
+                    <ShieldAlert className="w-3.5 h-3.5" style={{ color: "var(--color-non-compliant)" }} />
+                  )}
+                  <span className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
+                    Chunk #{i + 1}
+                  </span>
+                  <span className="text-[10px]" style={{ color: "var(--color-text-dim)" }}>
+                    {r.total_frames_analyzed} frames
+                  </span>
+                  {!r.overall_compliant && effectiveCompliant && (
+                    <span className="text-[10px] italic" style={{ color: "var(--color-compliant)" }}>
+                      resolved
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  {r.summary}
+                </p>
               </div>
-              <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-                {r.summary}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

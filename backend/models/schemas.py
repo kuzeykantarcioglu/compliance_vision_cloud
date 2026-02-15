@@ -24,6 +24,14 @@ class PolicyRule(BaseModel):
         default="high",
         description='Impact level: "low", "medium", "high", "critical"',
     )
+    frequency: str = Field(
+        default="always",
+        description='How often compliance must be observed: "always" (every frame), "at_least_once", "at_least_n"',
+    )
+    frequency_count: int = Field(
+        default=1,
+        description='Number of times compliance must be observed (used when frequency == "at_least_n")',
+    )
 
 
 class ReferenceImage(BaseModel):
@@ -71,11 +79,22 @@ class Policy(BaseModel):
         default_factory=list,
         description="IDs of references to check. Only these are sent to the VLM. Empty = no references checked.",
     )
+    prior_context: str = Field(
+        default="",
+        description="Context from prior monitoring chunks about already-satisfied frequency rules (for live monitoring).",
+    )
 
 
 # ---------------------------------------------------------------------------
 # VLM output (per keyframe)
 # ---------------------------------------------------------------------------
+
+class PersonDetail(BaseModel):
+    """One person identified in a single frame by the VLM."""
+    person_id: str = Field(..., description='Consistent ID based on appearance, e.g. "Person_A"')
+    appearance: str = Field(..., description='Brief appearance description for re-identification')
+    details: str = Field(default="", description='Compliance-relevant details: badges, PPE, actions')
+
 
 class FrameObservation(BaseModel):
     timestamp: float = Field(..., description="Seconds into the video")
@@ -88,6 +107,10 @@ class FrameObservation(BaseModel):
     image_base64: str = Field(
         default="",
         description="Base64-encoded keyframe image (evidence screenshot)",
+    )
+    people: list[PersonDetail] = Field(
+        default_factory=list,
+        description="People identified in this frame by the VLM",
     )
 
 
@@ -125,6 +148,22 @@ class TranscriptResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Per-person compliance summary
+# ---------------------------------------------------------------------------
+
+class PersonSummary(BaseModel):
+    """Aggregated compliance status for one tracked person across all frames."""
+    person_id: str = Field(..., description='Consistent ID, e.g. "Person_A"')
+    appearance: str = Field(..., description="Appearance description for identification")
+    first_seen: float = Field(..., description="Timestamp of first appearance (seconds)")
+    last_seen: float = Field(..., description="Timestamp of last appearance (seconds)")
+    frames_seen: int = Field(default=1, description="Number of frames this person appeared in")
+    compliant: bool = Field(default=True, description="Overall compliance status for this person")
+    violations: list[str] = Field(default_factory=list, description="Rule descriptions this person violated")
+    thumbnail_base64: str = Field(default="", description="Screenshot from first clear sighting")
+
+
+# ---------------------------------------------------------------------------
 # Final report
 # ---------------------------------------------------------------------------
 
@@ -142,6 +181,10 @@ class Report(BaseModel):
     )
     recommendations: list[str] = Field(default_factory=list)
     frame_observations: list[FrameObservation] = Field(default_factory=list)
+    person_summaries: list[PersonSummary] = Field(
+        default_factory=list,
+        description="Per-person compliance tracking across all frames",
+    )
     transcript: Optional[TranscriptResult] = Field(
         default=None,
         description="Whisper transcript (if audio analysis was enabled)",

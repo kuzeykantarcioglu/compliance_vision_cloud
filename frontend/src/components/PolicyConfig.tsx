@@ -10,12 +10,18 @@ interface Props {
 
 const STORAGE_KEY = "compliance_vision_presets";
 
+const FREQUENCY_OPTIONS = [
+  { value: "always", label: "Always" },
+  { value: "at_least_once", label: "At least once" },
+  { value: "at_least_n", label: "At least N" },
+] as const;
+
 const BUILT_IN_PRESETS: Record<string, Policy> = {
   "Audio: I Love TreeHacks": {
     rules: [
-      { type: "speech", description: "The phrase 'I love TreeHacks' must be said at least 3 times", severity: "critical" },
-      { type: "speech", description: "The speaker must sound enthusiastic when saying 'I love TreeHacks'", severity: "medium" },
-      { type: "speech", description: "No long silences — the speaker should be actively talking", severity: "low" },
+      { type: "speech", description: "The phrase 'I love TreeHacks' must be said at least 3 times", severity: "critical", frequency: "at_least_n", frequency_count: 3 },
+      { type: "speech", description: "The speaker must sound enthusiastic when saying 'I love TreeHacks'", severity: "medium", frequency: "at_least_once" },
+      { type: "speech", description: "No long silences — the speaker should be actively talking", severity: "low", frequency: "always" },
     ],
     custom_prompt: "Count exactly how many times 'I love TreeHacks' (or very close variants like 'I love tree hacks') is spoken. The requirement is at least 3 times. Report the exact count. Quote the relevant transcript segments.",
     include_audio: true,
@@ -24,9 +30,9 @@ const BUILT_IN_PRESETS: Record<string, Policy> = {
   },
   "TreeHacks Badge + Wave": {
     rules: [
-      { type: "badge", description: "Person must be wearing a dark green, tree-shaped badge", severity: "critical" },
-      { type: "action", description: "Person with the badge must be waving", severity: "high" },
-      { type: "presence", description: "Only persons with the tree-shaped badge should be present", severity: "medium" },
+      { type: "badge", description: "Person must be wearing a dark green, tree-shaped badge", severity: "critical", frequency: "at_least_once" },
+      { type: "action", description: "Person with the badge must be waving", severity: "high", frequency: "at_least_once" },
+      { type: "presence", description: "Only persons with the tree-shaped badge should be present", severity: "medium", frequency: "always" },
     ],
     custom_prompt: "Look specifically for a dark green badge shaped like a tree (like a pine/evergreen). Check if the person wearing it is actively waving their hand. Report clearly whether the badge is visible and whether they are waving or not.",
     include_audio: false,
@@ -35,9 +41,9 @@ const BUILT_IN_PRESETS: Record<string, Policy> = {
   },
   "PPE Compliance": {
     rules: [
-      { type: "ppe", description: "All persons must wear a hard hat", severity: "critical" },
-      { type: "ppe", description: "All persons must wear a high-visibility safety vest", severity: "high" },
-      { type: "ppe", description: "Safety goggles must be worn near machinery", severity: "high" },
+      { type: "ppe", description: "All persons must wear a hard hat", severity: "critical", frequency: "always" },
+      { type: "ppe", description: "All persons must wear a high-visibility safety vest", severity: "high", frequency: "always" },
+      { type: "ppe", description: "Safety goggles must be worn near machinery", severity: "high", frequency: "always" },
     ],
     custom_prompt: "Focus on personal protective equipment compliance in an industrial/construction setting.",
     include_audio: false,
@@ -46,9 +52,9 @@ const BUILT_IN_PRESETS: Record<string, Policy> = {
   },
   "Badge & Access Control": {
     rules: [
-      { type: "badge", description: "All persons must have a visible ID badge", severity: "high" },
-      { type: "presence", description: "No unauthorized persons in the area", severity: "critical" },
-      { type: "environment", description: "All doors to restricted areas must be closed", severity: "medium" },
+      { type: "badge", description: "All persons must have a visible ID badge", severity: "high", frequency: "at_least_once" },
+      { type: "presence", description: "No unauthorized persons in the area", severity: "critical", frequency: "always" },
+      { type: "environment", description: "All doors to restricted areas must be closed", severity: "medium", frequency: "always" },
     ],
     custom_prompt: "Focus on badge visibility and access control in a secure facility. Compare all badges against the reference image if provided.",
     include_audio: false,
@@ -57,10 +63,10 @@ const BUILT_IN_PRESETS: Record<string, Policy> = {
   },
   "Workspace Safety + Audio": {
     rules: [
-      { type: "environment", description: "Emergency exits must be unobstructed", severity: "critical" },
-      { type: "speech", description: "Safety briefing must be delivered verbally", severity: "high" },
-      { type: "speech", description: "No hostile or aggressive language", severity: "critical" },
-      { type: "ppe", description: "Closed-toe shoes required at all times", severity: "medium" },
+      { type: "environment", description: "Emergency exits must be unobstructed", severity: "critical", frequency: "always" },
+      { type: "speech", description: "Safety briefing must be delivered verbally", severity: "high", frequency: "at_least_once" },
+      { type: "speech", description: "No hostile or aggressive language", severity: "critical", frequency: "always" },
+      { type: "ppe", description: "Closed-toe shoes required at all times", severity: "medium", frequency: "always" },
     ],
     custom_prompt: "General workplace safety audit. Pay attention to verbal safety briefings and communications.",
     include_audio: true,
@@ -166,14 +172,16 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
   const addRule = () => {
     onChange({
       ...policy,
-      rules: [...policy.rules, { type: "custom", description: "", severity: "high" }],
+      rules: [...policy.rules, { type: "custom", description: "", severity: "high", frequency: "always", frequency_count: 1 }],
     });
   };
 
   const updateRule = (index: number, updates: Partial<PolicyRule>) => {
     const rules = [...policy.rules];
     rules[index] = { ...rules[index], ...updates };
-    onChange({ ...policy, rules });
+    // Auto-enable audio when any speech rule exists
+    const hasSpeechRule = rules.some((r) => r.type === "speech");
+    onChange({ ...policy, rules, include_audio: hasSpeechRule ? true : policy.include_audio });
   };
 
   const removeRule = (index: number) => {
@@ -198,6 +206,25 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
           Compliance Policy
         </label>
         <div className="flex items-center gap-1.5">
+          {/* New blank policy */}
+          <button
+            onClick={() => {
+              onChange({
+                rules: [{ type: "custom", description: "", severity: "high", frequency: "always", frequency_count: 1 }],
+                custom_prompt: "",
+                include_audio: false,
+                reference_images: policy.reference_images,
+                enabled_reference_ids: [],
+              });
+            }}
+            disabled={disabled}
+            className="flex items-center gap-1 text-[10px] px-2 py-1.5 rounded transition-colors hover:bg-black/5"
+            style={{ color: "var(--color-text-dim)", opacity: disabled ? 0.5 : 1 }}
+            title="New blank policy"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+
           {/* Import */}
           <button
             onClick={() => importRef.current?.click()}
@@ -353,13 +380,13 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
             className="flex items-start gap-2 p-3 rounded border animate-slide-up"
             style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
           >
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 min-w-0 space-y-2">
               <div className="flex gap-2">
                 <select
                   value={rule.type}
                   onChange={(e) => updateRule(i, { type: e.target.value })}
                   disabled={disabled}
-                  className="text-xs px-2 py-1.5 rounded border bg-transparent"
+                  className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent"
                   style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
                 >
                   {RULE_TYPES.map((t) => (
@@ -372,7 +399,7 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
                   value={rule.severity}
                   onChange={(e) => updateRule(i, { severity: e.target.value as PolicyRule["severity"] })}
                   disabled={disabled}
-                  className="text-xs px-2 py-1.5 rounded border bg-transparent font-medium"
+                  className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent font-medium"
                   style={{
                     borderColor: "var(--color-border)",
                     color: SEVERITY_COLORS[rule.severity],
@@ -384,6 +411,32 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
                     </option>
                   ))}
                 </select>
+                <select
+                  value={rule.frequency || "always"}
+                  onChange={(e) => updateRule(i, { frequency: e.target.value as PolicyRule["frequency"] })}
+                  disabled={disabled}
+                  className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-accent)" }}
+                >
+                  {FREQUENCY_OPTIONS.map((f) => (
+                    <option key={f.value} value={f.value} style={{ background: "var(--color-surface)" }}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                {rule.frequency === "at_least_n" && (
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={rule.frequency_count || 1}
+                    onChange={(e) => updateRule(i, { frequency_count: Math.max(1, parseInt(e.target.value) || 1) })}
+                    disabled={disabled}
+                    className="text-xs px-2 py-1.5 rounded border bg-transparent w-14 text-center shrink-0"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-accent)" }}
+                    title="Number of times required"
+                  />
+                )}
               </div>
               <input
                 type="text"
@@ -398,7 +451,7 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
             {!disabled && (
               <button
                 onClick={() => removeRule(i)}
-                className="p-1.5 rounded hover:bg-black/5 transition-colors mt-1"
+                className="p-1.5 rounded hover:bg-black/5 transition-colors mt-1 shrink-0"
               >
                 <Trash2 className="w-3.5 h-3.5" style={{ color: "var(--color-text-dim)" }} />
               </button>
@@ -493,47 +546,55 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
       </div>
 
       {/* Audio analysis toggle */}
-      <button
-        onClick={() => !disabled && onChange({ ...policy, include_audio: !policy.include_audio })}
-        disabled={disabled}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded border transition-all"
-        style={{
-          borderColor: policy.include_audio ? "var(--color-accent)" : "var(--color-border)",
-          background: policy.include_audio ? "rgba(15,23,42,0.06)" : "var(--color-surface-2)",
-          opacity: disabled ? 0.5 : 1,
-          cursor: disabled ? "not-allowed" : "pointer",
-        }}
-      >
-        {policy.include_audio ? (
-          <Mic className="w-4 h-4 shrink-0" style={{ color: "var(--color-accent)" }} />
-        ) : (
-          <MicOff className="w-4 h-4 shrink-0" style={{ color: "var(--color-text-dim)" }} />
-        )}
-        <div className="flex-1 text-left">
-          <p className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
-            Audio Analysis (Whisper)
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--color-text-dim)" }}>
-            {policy.include_audio
-              ? "Enabled — audio will be transcribed and evaluated against policy"
-              : "Disabled — only visual analysis will be performed"}
-          </p>
-        </div>
-        <div
-          className="w-8 h-4.5 rounded-full relative transition-colors"
-          style={{
-            background: policy.include_audio ? "var(--color-accent)" : "var(--color-border)",
-            padding: "2px",
-          }}
-        >
-          <div
-            className="w-3.5 h-3.5 rounded-full bg-white transition-transform"
+      {(() => {
+        const hasSpeechRules = policy.rules.some((r) => r.type === "speech");
+        const lockedOn = hasSpeechRules; // Can't disable while speech rules exist
+        return (
+          <button
+            onClick={() => !disabled && !lockedOn && onChange({ ...policy, include_audio: !policy.include_audio })}
+            disabled={disabled || lockedOn}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded border transition-all"
             style={{
-              transform: policy.include_audio ? "translateX(14px)" : "translateX(0)",
+              borderColor: policy.include_audio ? "var(--color-accent)" : "var(--color-border)",
+              background: policy.include_audio ? "rgba(15,23,42,0.06)" : "var(--color-surface-2)",
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled || lockedOn ? "not-allowed" : "pointer",
             }}
-          />
-        </div>
-      </button>
+          >
+            {policy.include_audio ? (
+              <Mic className="w-4 h-4 shrink-0" style={{ color: "var(--color-accent)" }} />
+            ) : (
+              <MicOff className="w-4 h-4 shrink-0" style={{ color: "var(--color-text-dim)" }} />
+            )}
+            <div className="flex-1 text-left">
+              <p className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
+                Audio Analysis (Whisper)
+              </p>
+              <p className="text-[10px]" style={{ color: "var(--color-text-dim)" }}>
+                {lockedOn
+                  ? "Auto-enabled — required by speech rules in your policy"
+                  : policy.include_audio
+                    ? "Enabled — audio will be transcribed and evaluated against policy"
+                    : "Disabled — only visual analysis will be performed"}
+              </p>
+            </div>
+            <div
+              className="w-8 h-4.5 rounded-full relative transition-colors"
+              style={{
+                background: policy.include_audio ? "var(--color-accent)" : "var(--color-border)",
+                padding: "2px",
+              }}
+            >
+              <div
+                className="w-3.5 h-3.5 rounded-full bg-white transition-transform"
+                style={{
+                  transform: policy.include_audio ? "translateX(14px)" : "translateX(0)",
+                }}
+              />
+            </div>
+          </button>
+        );
+      })()}
 
     </div>
   );

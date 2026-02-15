@@ -12,7 +12,7 @@ import json
 from openai import AsyncOpenAI
 
 from backend.core.config import OPENAI_API_KEY
-from backend.models.schemas import KeyframeData, FrameObservation, Policy, ReferenceImage
+from backend.models.schemas import KeyframeData, FrameObservation, PersonDetail, Policy, ReferenceImage
 
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
@@ -30,22 +30,32 @@ BATCH_SIZE = 5
 SYSTEM_PROMPT = """You are a visual surveillance analyst for a compliance monitoring system.
 
 For each image provided, describe what you see concisely and factually. Focus on:
-- **People**: count, approximate location in frame, clothing, badges/ID visible (color, type), PPE (helmets, vests, gloves, goggles), posture, actions
-- **Objects**: bags, equipment, vehicles, signage, barriers, doors (open/closed)
-- **Environment**: indoor/outdoor, lighting conditions, area type (industrial, office, retail, construction), any hazards visible
-- **Actions/Events**: what is happening, movement patterns, interactions between people
+- **People**: count, location, clothing, badges/ID visible, PPE, posture, actions
+- **Objects**: equipment, signage, barriers, doors
+- **Environment**: indoor/outdoor, area type, hazards
+- **Actions**: what is happening, movement patterns
 
-Be specific and factual. Do not speculate or make assumptions beyond what is visible.
-If something is unclear or partially obscured, say so.
+PERSON IDENTIFICATION:
+1. If REFERENCE IMAGES of people are provided, compare each visible person against them.
+   - If a person matches a reference image, use the reference label as their person_id (e.g., "Kuzey" not "Person_A").
+   - Compare face, hair, build, clothing, glasses, and other features.
+   - Be confident: if there's a strong match, use the reference name.
+2. For people who do NOT match any reference, assign generic IDs: "Person_A", "Person_B", etc.
+3. Use the SAME identifier for the same person across multiple frames.
 
-Output your response as a JSON array with one object per image, in the same order as the images provided. Each object should have:
-- "timestamp": the timestamp value provided for that image
-- "description": your detailed observation (string)
+Be concise and factual. If something is unclear, note it briefly.
 
-Example output for 2 images:
+Output JSON array, one object per image:
+- "timestamp": the timestamp value
+- "description": concise observation (1-2 sentences)
+- "people": array of people visible:
+  - "person_id": reference label if matched, else "Person_A" etc.
+  - "appearance": brief description (clothing, build, hair)
+  - "details": compliance-relevant details (badges, PPE, actions)
+
+Example:
 [
-  {"timestamp": 0.0, "description": "Indoor office space. 2 people visible. Person 1: standing near door, wearing blue lanyard with green badge visible. Person 2: seated at desk, no badge visible. Environment: well-lit, open floor plan."},
-  {"timestamp": 5.0, "description": "Same space. Person 1 has exited frame. Person 2 still seated. A third person entering from left side wearing yellow hard hat and orange safety vest. Door in background is now open."}
+  {"timestamp": 0.0, "description": "Indoor office. 2 people visible.", "people": [{"person_id": "Kuzey", "appearance": "curly hair, glasses, green shirt", "details": "standing near door, wearing green badge, waving"}, {"person_id": "Person_B", "appearance": "woman, red sweater", "details": "seated, no badge visible"}]}
 ]"""
 
 
@@ -99,9 +109,11 @@ def _build_reference_context(policy: Policy) -> str:
 
     parts.append(
         "For each reference, answer each check explicitly in your observation. "
-        "Be conclusive — state YES or NO for each check, then explain. "
-        "For people: compare facial features, hair, clothing, build. "
-        "For badges: compare color, shape, logo, text. "
+        "Be conclusive — state YES or NO for each check, then explain.\n"
+        "For PEOPLE references: compare face, hair, build, clothing, glasses. "
+        "If a person matches a people reference, use the reference LABEL as their person_id in the 'people' array "
+        "(e.g., if reference is labeled 'Kuzey' and someone matches, use person_id='Kuzey').\n"
+        "For badges: compare color, shape, logo, text.\n"
         "For objects: compare shape, size, color, markings."
     )
     return "\n".join(parts)
@@ -145,13 +157,13 @@ def _build_batch_messages(
     if policy.reference_images:
         content.append({"type": "text", "text": "[SURVEILLANCE FRAMES BELOW]"})
 
-    # Add each surveillance keyframe
+    # Add each surveillance keyframe — detail:auto for action recognition
     for kf in batch:
         content.append({
             "type": "image_url",
             "image_url": {
                 "url": f"data:image/jpeg;base64,{kf.image_base64}",
-                "detail": "low",
+                "detail": "auto",
             },
         })
 
@@ -170,9 +182,9 @@ async def _analyze_batch(
     messages = _build_batch_messages(batch, policy_context, policy)
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=messages,
-        max_tokens=1500,
+        max_tokens=1000,
         temperature=0.1,  # Low temp for factual descriptions
     )
 
@@ -198,9 +210,21 @@ async def _analyze_batch(
     observations = []
     for i, kf in enumerate(batch):
         if i < len(parsed):
-            desc = parsed[i].get("description", str(parsed[i]))
+            item = parsed[i] if isinstance(parsed[i], dict) else {}
+            desc = item.get("description", str(parsed[i]))
+            # Parse people array from VLM response
+            raw_people = item.get("people", [])
+            people = []
+            for p in raw_people:
+                if isinstance(p, dict) and "person_id" in p:
+                    people.append(PersonDetail(
+                        person_id=p.get("person_id", "Unknown"),
+                        appearance=p.get("appearance", ""),
+                        details=p.get("details", ""),
+                    ))
         else:
             desc = "No observation returned for this frame."
+            people = []
 
         observations.append(FrameObservation(
             timestamp=kf.timestamp,
@@ -208,6 +232,7 @@ async def _analyze_batch(
             trigger=kf.trigger,
             change_score=kf.change_score,
             image_base64=kf.image_base64,
+            people=people,
         ))
 
     return observations
