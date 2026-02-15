@@ -48,8 +48,8 @@ cd frontend && npm install && cd ..
 
 # Start the app (2 terminals minimum)
 
-# Terminal 1: Backend API
-uvicorn backend.main:app --reload
+# Terminal 1: Backend API (port 8082)
+uvicorn backend.main:app --reload --port 8082
 
 # Terminal 2: Frontend
 cd frontend && npm run dev

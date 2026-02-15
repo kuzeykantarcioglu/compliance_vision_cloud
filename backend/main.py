@@ -67,6 +67,13 @@ async def health_check():
         "status": "ok",
         "openai_key_set": bool(OPENAI_API_KEY),
     }
+
+    # DGX Spark status (cached, never blocks)
+    try:
+        from backend.services.dgx import get_dgx_cached_status
+        health_status["dgx"] = get_dgx_cached_status()
+    except ImportError:
+        health_status["dgx"] = {"status": "not available"}
     
     # Check Redis connection (if available)
     try:

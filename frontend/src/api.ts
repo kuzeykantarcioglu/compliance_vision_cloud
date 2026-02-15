@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Policy, AnalyzeResponse } from "./types";
+import type { Policy, AnalyzeResponse, AIProvider } from "./types";
 
 const api = axios.create({
   baseURL: "/api",
@@ -63,11 +63,13 @@ export async function analyzeVideo(
 export async function analyzeFrame(
   imageBase64: string,
   policy: Policy,
+  provider: AIProvider = "openai",
 ): Promise<AnalyzeResponse> {
   try {
     const res = await api.post<AnalyzeResponse>("/analyze/frame", {
       image_base64: imageBase64,
       policy_json: JSON.stringify(policy),
+      provider,
     });
     return res.data;
   } catch (err: any) {
@@ -76,7 +78,26 @@ export async function analyzeFrame(
   }
 }
 
-export async function healthCheck(): Promise<{ status: string; openai_key_set: boolean }> {
+/** DGX batch frame analysis: send multiple JPEG frames (captured over ~3s) as a video clip. */
+export async function analyzeFrameBatch(
+  frames: string[],
+  policy: Policy,
+): Promise<AnalyzeResponse> {
+  try {
+    const res = await api.post<AnalyzeResponse>("/analyze/frame", {
+      image_base64: "",
+      frames,
+      policy_json: JSON.stringify(policy),
+      provider: "dgx",
+    });
+    return res.data;
+  } catch (err: any) {
+    const msg = err.response?.data?.detail || err.message || "Unknown error";
+    return { status: "error", report: null, error: msg };
+  }
+}
+
+export async function healthCheck(): Promise<{ status: string; openai_key_set: boolean; dgx?: { status: string; url?: string; error?: string } }> {
   const res = await api.get("/health");
   return res.data;
 }

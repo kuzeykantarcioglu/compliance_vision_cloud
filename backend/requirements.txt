@@ -5,6 +5,8 @@ openai
 opencv-python-headless
 numpy
 python-multipart
+httpx
+requests
 celery[redis]
 redis>=6.4.0
 websockets

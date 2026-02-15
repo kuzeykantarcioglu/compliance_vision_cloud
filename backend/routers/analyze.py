@@ -26,6 +26,7 @@ from backend.services.vlm import analyze_frames
 from backend.services.policy import evaluate_and_report, analyze_and_evaluate_combined
 from backend.services.whisper import transcribe_video
 from backend.services.speech_policy import evaluate_speech
+from backend.services.dgx import analyze_frame_dgx
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 logger = logging.getLogger(__name__)
@@ -392,9 +393,14 @@ async def analyze_frame(request: FrameAnalyzeRequest):
 
     Ultra-fast path for webcam monitoring. No file I/O, no OpenCV, no ffmpeg.
     Sends the frame directly to the combined VLM+policy evaluator.
+
+    Supports two providers:
+      - "openai" (default): sends frame to GPT-4o-mini
+      - "dgx": sends frame to NVIDIA DGX Spark (Cosmos + Nemotron)
     """
     t0 = time.perf_counter()
-    logger.info("📸 FRAME ANALYSIS REQUEST")
+    provider = (request.provider or "openai").lower()
+    logger.info(f"📸 FRAME ANALYSIS REQUEST (provider={provider})")
 
     # --- Parse policy ---
     try:
@@ -411,42 +417,56 @@ async def analyze_frame(request: FrameAnalyzeRequest):
     if image_b64.startswith("data:"):
         image_b64 = image_b64.split(",", 1)[1]
 
-    # --- Build a single KeyframeData in memory — no disk I/O ---
-    keyframe = KeyframeData(
-        timestamp=0.0,
-        frame_number=0,
-        change_score=1.0,
-        trigger="webcam_frame",
-        keyframe_path="",
-        image_base64=image_b64,
-    )
-
-    # --- Get effective reference images ---
-    enabled_refs = policy.enabled_reference_ids or []
-    refs = (
-        [r for r in policy.reference_images if getattr(r, "id", None) and r.id in enabled_refs]
-        if enabled_refs else []
-    )
-
-    # --- Call combined analysis directly ---
-    try:
-        report = await analyze_and_evaluate_combined(
-            keyframes=[keyframe],
-            policy=policy,
-            video_id=f"frame-{uuid.uuid4().hex[:8]}",
-            video_duration=0.0,
-            prior_context=policy.prior_context,
-            reference_images=refs,
+    # --- Route to the selected provider ---
+    if provider == "dgx":
+        # DGX Spark path: send frames to NVIDIA DGX proxy as mp4 video
+        # Use batch frames if provided, otherwise single frame fallback
+        frames_batch = request.frames if request.frames else None
+        try:
+            report = await analyze_frame_dgx(
+                image_base64=image_b64,
+                policy=policy,
+                video_id=f"dgx-frame-{uuid.uuid4().hex[:8]}",
+                frames=frames_batch,
+            )
+        except Exception as e:
+            logger.error(f"❌ DGX frame analysis FAILED: {e}", exc_info=True)
+            return AnalyzeResponse(status="error", error=f"[DGX Frame Analysis] {e}")
+    else:
+        # OpenAI path (default): send to GPT-4o-mini
+        keyframe = KeyframeData(
+            timestamp=0.0,
+            frame_number=0,
+            change_score=1.0,
+            trigger="webcam_frame",
+            keyframe_path="",
+            image_base64=image_b64,
         )
-    except Exception as e:
-        logger.error(f"❌ Frame analysis FAILED: {e}", exc_info=True)
-        return AnalyzeResponse(status="error", error=f"[Frame Analysis] {e}")
+
+        enabled_refs = policy.enabled_reference_ids or []
+        refs = (
+            [r for r in policy.reference_images if getattr(r, "id", None) and r.id in enabled_refs]
+            if enabled_refs else []
+        )
+
+        try:
+            report = await analyze_and_evaluate_combined(
+                keyframes=[keyframe],
+                policy=policy,
+                video_id=f"frame-{uuid.uuid4().hex[:8]}",
+                video_duration=0.0,
+                prior_context=policy.prior_context,
+                reference_images=refs,
+            )
+        except Exception as e:
+            logger.error(f"❌ Frame analysis FAILED: {e}", exc_info=True)
+            return AnalyzeResponse(status="error", error=f"[Frame Analysis] {e}")
 
     _assign_person_thumbnails(report)
 
     elapsed = time.perf_counter() - t0
     logger.info(
-        f"📸 Frame analysis: {elapsed:.2f}s"
+        f"📸 Frame analysis ({provider}): {elapsed:.2f}s"
         f" | {'COMPLIANT' if report.overall_compliant else 'NON-COMPLIANT'}"
         f" | {len(report.person_summaries)} people"
     )

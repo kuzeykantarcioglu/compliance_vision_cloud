@@ -273,8 +273,16 @@ class AnalyzeResponse(BaseModel):
 
 class FrameAnalyzeRequest(BaseModel):
     """Single webcam frame for real-time monitoring (no video file needed)."""
-    image_base64: str = Field(..., description="Base64-encoded JPEG of a single webcam frame")
+    image_base64: str = Field(default="", description="Base64-encoded JPEG of a single webcam frame")
     policy_json: str = Field(..., description="JSON-stringified Policy object")
+    provider: str = Field(
+        default="openai",
+        description='AI provider to use: "openai" or "dgx"',
+    )
+    frames: list[str] = Field(
+        default=[],
+        description='For DGX batch mode: array of base64-encoded JPEG frames captured over ~3 seconds at 4fps',
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -120,3 +120,6 @@ export type PipelineStage =
   | "evaluating"
   | "complete"
   | "error";
+
+// AI provider selection
+export type AIProvider = "openai" | "dgx";

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Scan, ScrollText, Image, Shield, Sparkles, Camera, Eye, Activity } from "lucide-react";
-import type { ReferenceImage } from "./types";
+import type { ReferenceImage, AIProvider } from "./types";
 import StatusBar from "./components/Header";
 import StatusIndicator from "./components/StatusIndicator";
 import ThemeToggle, { applyTheme } from "./components/ThemeToggle";
@@ -12,7 +12,8 @@ import PollyChat from "./components/PollyChat";
 import PipelineStatus from "./components/PipelineStatus";
 import ReportView from "./components/ReportView";
 import LiveReportView from "./components/LiveReportView";
-import { analyzeVideo, analyzeFrame, healthCheck } from "./api";
+import ProviderToggle from "./components/ProviderToggle";
+import { analyzeVideo, analyzeFrame, analyzeFrameBatch, healthCheck } from "./api";
 import type { Policy, Report, PipelineStage } from "./types";
 
 // Apply saved theme before first paint to avoid flash
@@ -48,6 +49,9 @@ function saveReferences(images: ReferenceImage[]) {
 export default function App() {
   const [inputMode, setInputMode] = useState<InputMode>("file");
   const [leftTab, setLeftTab] = useState<LeftTab>("policy");
+  const [provider, setProvider] = useState<AIProvider>(
+    () => (localStorage.getItem("compliance_vision_provider") as AIProvider) || "openai"
+  );
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [stage, setStage] = useState<PipelineStage>("idle");
@@ -73,6 +77,13 @@ export default function App() {
     return { rules: [], custom_prompt: "", include_audio: false, reference_images: savedRefs, enabled_reference_ids: [] };
   });
   const policyRef = useRef<Policy>(policy);
+  const providerRef = useRef<AIProvider>(provider);
+
+  // Persist provider selection
+  useEffect(() => {
+    localStorage.setItem("compliance_vision_provider", provider);
+    providerRef.current = provider;
+  }, [provider]);
 
   // Persist reference images to localStorage whenever they change
   useEffect(() => {
@@ -341,7 +352,7 @@ export default function App() {
       currentPolicy.prior_context = priorCtx;
     }
 
-    const result = await analyzeFrame(imageBase64, currentPolicy);
+    const result = await analyzeFrame(imageBase64, currentPolicy, providerRef.current);
     if (!monitoringRef.current || sessionIdRef.current !== mySession) return false;
 
     if (result.status === "complete" && result.report) {
@@ -357,62 +368,128 @@ export default function App() {
     }
   }, [buildPriorContext]);
 
+  /** DGX batch analysis: send multiple buffered frames as a video clip.
+   *  Returns true on success, false on error. */
+  const analyzeDgxBatch = useCallback(async (frames: string[], mySession: number): Promise<boolean> => {
+    setLiveStage("analyzing");
+
+    const currentPolicy = { ...policyRef.current };
+    const priorCtx = buildPriorContext(liveReportsRef.current);
+    if (priorCtx) {
+      currentPolicy.prior_context = priorCtx;
+    }
+
+    const result = await analyzeFrameBatch(frames, currentPolicy);
+    if (!monitoringRef.current || sessionIdRef.current !== mySession) return false;
+
+    if (result.status === "complete" && result.report) {
+      setLiveReports((prev) => [...prev, result.report!]);
+      setChunksProcessed((prev) => prev + 1);
+      setLiveStage("complete");
+      setLiveError(null);
+      return true;
+    } else {
+      setLiveError(result.error || "DGX batch analysis failed.");
+      setLiveStage("error");
+      return false;
+    }
+  }, [buildPriorContext]);
+
   /**
-   * Frame-capture monitoring loop (replaces video chunk pipeline).
+   * Frame-capture monitoring loop.
    *
-   * Tight loop: capture instant JPEG → send to /analyze/frame → repeat.
-   * No video recording, no ffmpeg, no OpenCV. ~2-4s per cycle.
+   * Two modes depending on the selected AI provider:
    *
-   * Includes exponential backoff on errors (e.g. rate limits) to avoid
-   * hammering the API. Resets backoff after a successful call.
+   * **OpenAI mode:** Tight loop — capture single JPEG → send to /analyze/frame → repeat.
+   *   ~2-4s per cycle with 3s rate-limit pacing.
    *
-   * Timeline:
-   *   captureFrame() → await analyzeFrameChunk() → captureFrame() → ...
-   *   (capture is instant — <1ms — so no pipelining needed)
+   * **DGX mode:** Buffer 12 frames over 3 seconds at 4fps (exactly like security.py),
+   *   stitch into mp4 video on the backend, send to DGX Cosmos proxy → repeat.
+   *
+   * Includes exponential backoff on errors to avoid hammering the API.
    */
   const runMonitoringLoop = useCallback(async () => {
     const mySession = sessionIdRef.current;
     let consecutiveErrors = 0;
-    const BASE_DELAY_MS = 3_000;    // 3s minimum wait between calls (keeps us under RPM limits)
-    const MAX_BACKOFF_MS = 30_000;  // 30s max backoff on repeated errors
+    const isDgx = providerRef.current === "dgx";
 
-    // Warm-start health check in background
-    healthCheck().catch(() => {});
-    
+    // DGX: match security.py timing (3s clip, 4fps = 12 frames)
+    const DGX_CLIP_DURATION_MS = 3_000;
+    const DGX_FPS = 4;
+    const DGX_TOTAL_FRAMES = (DGX_CLIP_DURATION_MS / 1000) * DGX_FPS; // 12
+    const DGX_FRAME_INTERVAL_MS = DGX_CLIP_DURATION_MS / DGX_TOTAL_FRAMES; // 250ms
+
+    const BASE_DELAY_MS = isDgx ? 500 : 3_000;
+    const MAX_BACKOFF_MS = isDgx ? 10_000 : 30_000;
+
     // Wait a bit for webcam to fully initialize
     await new Promise((r) => setTimeout(r, 1000));
 
     while (monitoringRef.current && sessionIdRef.current === mySession) {
-      // 1. Capture a single JPEG frame from the webcam (instant)
-      const frameBase64 = captureFrame();
-      if (!frameBase64) {
-        // Webcam not ready yet — wait a moment and retry
-        console.log("Webcam not ready, waiting...");
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
-      }
-      
-      console.log(`Captured frame: ${frameBase64.length} chars`);
-      if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+      if (isDgx) {
+        // --- DGX mode: capture 12 frames over 3 seconds, send as batch ---
+        setLiveStage("capturing" as any);
+        const frames: string[] = [];
 
-      // 2. Send frame to backend and wait for result (~2-3s)
-      const success = await analyzeFrameChunk(frameBase64, mySession);
+        for (let i = 0; i < DGX_TOTAL_FRAMES; i++) {
+          if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+          const frame = captureFrame();
+          if (frame) frames.push(frame);
+          if (i < DGX_TOTAL_FRAMES - 1) {
+            await new Promise((r) => setTimeout(r, DGX_FRAME_INTERVAL_MS));
+          }
+        }
 
-      if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+        if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
 
-      // 3. Backoff on errors to avoid rate-limit storms; pace on success to stay under RPM
-      if (!success) {
-        consecutiveErrors++;
-        const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
-        console.warn(`[Monitor] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
-        await new Promise((r) => setTimeout(r, backoff));
+        if (frames.length === 0) {
+          console.log("Webcam not ready, waiting...");
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        console.log(`[DGX] Captured ${frames.length} frames over ${DGX_CLIP_DURATION_MS / 1000}s, sending batch...`);
+
+        const success = await analyzeDgxBatch(frames, mySession);
+        if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+
+        if (!success) {
+          consecutiveErrors++;
+          const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
+          console.warn(`[DGX] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
+          await new Promise((r) => setTimeout(r, backoff));
+        } else {
+          consecutiveErrors = 0;
+          await new Promise((r) => setTimeout(r, BASE_DELAY_MS));
+        }
+
       } else {
-        consecutiveErrors = 0;
-        // Pace requests to stay under RPM limits (wait at least BASE_DELAY between calls)
-        await new Promise((r) => setTimeout(r, BASE_DELAY_MS));
+        // --- OpenAI mode: single frame per request ---
+        const frameBase64 = captureFrame();
+        if (!frameBase64) {
+          console.log("Webcam not ready, waiting...");
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        console.log(`Captured frame: ${frameBase64.length} chars (provider: ${providerRef.current})`);
+        if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+
+        const success = await analyzeFrameChunk(frameBase64, mySession);
+        if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+
+        if (!success) {
+          consecutiveErrors++;
+          const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
+          console.warn(`[Monitor] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
+          await new Promise((r) => setTimeout(r, backoff));
+        } else {
+          consecutiveErrors = 0;
+          await new Promise((r) => setTimeout(r, BASE_DELAY_MS));
+        }
       }
     }
-  }, [captureFrame, analyzeFrameChunk]);
+  }, [captureFrame, analyzeFrameChunk, analyzeDgxBatch]);
 
   const canStartMonitoring =
     (policy.rules.length > 0 || policy.custom_prompt.trim().length > 0) &&
@@ -536,6 +613,12 @@ export default function App() {
                 onStartMonitoring={handleStartMonitoring}
                 onStopMonitoring={handleStopMonitoring}
                 disabled={isFileRunning || (inputMode === "webcam" && !canStartMonitoring)}
+              />
+
+              <ProviderToggle
+                provider={provider}
+                onChange={setProvider}
+                disabled={isFileRunning || isMonitoring}
               />
 
               <PolicyConfig
