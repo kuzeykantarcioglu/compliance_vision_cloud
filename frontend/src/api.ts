@@ -116,6 +116,33 @@ export async function analyzeFrameBatchParallel(
   }
 }
 
+/** Send an audio blob for Whisper transcription (background audio recording). */
+export async function transcribeAudio(
+  audioBlob: Blob,
+): Promise<{ status: string; transcript: { full_text: string; segments: { start: number; end: number; text: string }[]; language: string; duration: number } | null; error?: string }> {
+  try {
+    const formData = new FormData();
+    formData.append("audio", audioBlob, `audio-${Date.now()}.webm`);
+    const res = await api.post("/analyze/transcribe", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 30_000,
+    });
+    return res.data;
+  } catch (err: any) {
+    const msg = err.response?.data?.detail || err.message || "Transcription failed";
+    return { status: "error", transcript: null, error: msg };
+  }
+}
+
+/** Reset backend compliance state (call on session clear). */
+export async function resetComplianceState(): Promise<void> {
+  try {
+    await api.post("/analyze/reset");
+  } catch (err) {
+    console.warn("Failed to reset compliance state:", err);
+  }
+}
+
 export async function healthCheck(): Promise<{ status: string; openai_key_set: boolean; dgx?: { status: string; url?: string; error?: string } }> {
   const res = await api.get("/health");
   return res.data;

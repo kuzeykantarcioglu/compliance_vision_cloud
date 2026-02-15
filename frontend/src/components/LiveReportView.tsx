@@ -2,6 +2,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   AlertTriangle,
+  CheckCircle,
   Clock,
   Download,
   Radio,
@@ -9,6 +10,7 @@ import {
   Mic,
   Camera,
   Users,
+  ClipboardCheck,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import type { Report, Verdict, TranscriptSegment, FrameObservation, PersonSummary } from "../types";
@@ -371,6 +373,90 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
           })}
         </div>
       )}
+
+      {/* Compliance Checklist — aggregated from checklist-mode verdicts */}
+      {(() => {
+        // Aggregate checklist verdicts, deduplicate by rule_description (last report wins)
+        const checklistMap = new Map<string, { verdict: Verdict; chunkIndex: number }>();
+        reports.forEach((r, ri) => {
+          for (const v of r.all_verdicts) {
+            if (v.mode === "checklist") {
+              checklistMap.set(v.rule_description, { verdict: v, chunkIndex: ri });
+            }
+          }
+        });
+        const checklistEntries = Array.from(checklistMap.values());
+        if (checklistEntries.length === 0) return null;
+
+        const fulfilledCount = checklistEntries.filter(e => e.verdict.compliant).length;
+        const allFulfilled = fulfilledCount === checklistEntries.length;
+
+        return (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium flex items-center gap-2"
+              style={{ color: "var(--color-text)" }}>
+              <ClipboardCheck className="w-4 h-4" style={{ color: "var(--color-accent)" }} />
+              Compliance Checklist ({fulfilledCount}/{checklistEntries.length})
+            </h3>
+
+            {/* Fulfilled banner */}
+            <div
+              className="p-3 rounded border"
+              style={{
+                borderColor: allFulfilled ? "var(--color-compliant)" : "var(--color-high)",
+                background: allFulfilled ? "rgba(34,197,94,0.08)" : "rgba(234,179,8,0.08)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                {allFulfilled ? (
+                  <CheckCircle className="w-4 h-4" style={{ color: "var(--color-compliant)" }} />
+                ) : (
+                  <Clock className="w-4 h-4" style={{ color: "var(--color-high)" }} />
+                )}
+                <span className="text-xs font-semibold" style={{
+                  color: allFulfilled ? "var(--color-compliant)" : "var(--color-high)",
+                }}>
+                  {allFulfilled
+                    ? "All checklist items fulfilled"
+                    : `Checklist not fulfilled — ${checklistEntries.length - fulfilledCount} of ${checklistEntries.length} item${checklistEntries.length - fulfilledCount !== 1 ? "s" : ""} pending`}
+                </span>
+              </div>
+            </div>
+
+            {/* Individual checklist items */}
+            {checklistEntries.map(({ verdict: v }, i) => (
+              <div
+                key={i}
+                className="flex gap-3 p-3 rounded border"
+                style={{
+                  borderColor: "var(--color-border)",
+                  background: v.compliant ? "rgba(34,197,94,0.04)" : "var(--color-surface-2)",
+                }}
+              >
+                {v.compliant ? (
+                  <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-compliant)" }} />
+                ) : (
+                  <Clock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-medium)" }} />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium" style={{ color: "var(--color-text)" }}>
+                    {v.rule_description}
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--color-text-dim)" }}>
+                    {v.compliant ? v.reason || "Verified" : v.checklist_status === "expired" ? "Verification expired — needs renewal" : "Pending verification"}
+                  </p>
+                  {v.compliant && v.expires_at && (
+                    <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: "var(--color-text-dim)" }}>
+                      <Clock className="w-2.5 h-2.5" />
+                      Valid for {Math.max(0, Math.round((v.expires_at - Date.now() / 1000) / 60))} min
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Live transcript feed */}
       {hasTranscript && (

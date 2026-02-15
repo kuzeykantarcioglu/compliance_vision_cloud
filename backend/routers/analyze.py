@@ -27,6 +27,7 @@ from backend.services.policy import evaluate_and_report, analyze_and_evaluate_co
 from backend.services.whisper import transcribe_video
 from backend.services.speech_policy import evaluate_speech
 from backend.services.dgx import analyze_frame_dgx, analyze_frames_dgx_parallel
+from backend.services.compliance_state import compliance_tracker
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 logger = logging.getLogger(__name__)
@@ -307,11 +308,12 @@ async def analyze_video(
             prior_context=policy.prior_context,
         )
 
-    if has_speech and transcript and transcript.full_text:
+    if has_speech and (transcript and transcript.full_text or policy.accumulated_transcript):
         eval_tasks["speech"] = evaluate_speech(
             transcript=transcript,
             speech_rules=speech_rules,
             custom_prompt=policy.custom_prompt,
+            accumulated_transcript=policy.accumulated_transcript,
         )
     elif has_speech:
         logger.warning("Speech rules present but no audio transcript — skipping speech eval")
@@ -338,11 +340,13 @@ async def analyze_video(
     if visual_report and speech_verdicts:
         report = visual_report
         report.all_verdicts.extend(speech_verdicts)
-        speech_incidents = [v for v in speech_verdicts if not v.compliant]
+        # Only incident-mode speech violations become incidents; checklist-mode are tracked separately
+        speech_incidents = [v for v in speech_verdicts if not v.compliant and v.mode == "incident"]
         report.incidents.extend(speech_incidents)
-        if speech_incidents:
+        non_compliant_speech = [v for v in speech_verdicts if not v.compliant]
+        if non_compliant_speech:
             report.overall_compliant = False
-            report.summary += f" Speech: {len(speech_incidents)} audio violation(s)."
+            report.summary += f" Speech: {len(non_compliant_speech)} audio violation(s)."
         report.transcript = transcript
     elif visual_report:
         report = visual_report
@@ -351,14 +355,16 @@ async def analyze_video(
             report.transcript = transcript
     elif speech_verdicts:
         from datetime import datetime, timezone
-        speech_incidents = [v for v in speech_verdicts if not v.compliant]
+        # Only incident-mode speech violations become incidents
+        speech_incidents = [v for v in speech_verdicts if not v.compliant and v.mode == "incident"]
+        non_compliant_speech = [v for v in speech_verdicts if not v.compliant]
         report = Report(
             video_id=video_result.video_id,
-            summary=f"Speech: {len(speech_incidents)} violation(s) of {len(speech_verdicts)} rules.",
-            overall_compliant=len(speech_incidents) == 0,
+            summary=f"Speech: {len(non_compliant_speech)} violation(s) of {len(speech_verdicts)} rules.",
+            overall_compliant=len(non_compliant_speech) == 0,
             incidents=speech_incidents,
             all_verdicts=speech_verdicts,
-            recommendations=[v.reason for v in speech_incidents][:3] if speech_incidents else ["All speech rules compliant."],
+            recommendations=[v.reason for v in non_compliant_speech][:3] if non_compliant_speech else ["All speech rules compliant."],
             frame_observations=observations,
             transcript=transcript,
             analyzed_at=datetime.now(timezone.utc).isoformat(),
@@ -369,6 +375,11 @@ async def analyze_video(
         return AnalyzeResponse(status="error", error="No rules to evaluate.")
 
     timings["policy_evaluation"] = round(time.perf_counter() - t0, 2)
+
+    # Recompute checklist_fulfilled to include speech checklist verdicts
+    checklist_verdicts = [v for v in report.all_verdicts if v.mode == "checklist"]
+    if checklist_verdicts:
+        report.checklist_fulfilled = all(v.compliant for v in checklist_verdicts)
 
     _assign_person_thumbnails(report)
 
@@ -462,6 +473,39 @@ async def analyze_frame(request: FrameAnalyzeRequest):
             logger.error(f"❌ Frame analysis FAILED: {e}", exc_info=True)
             return AnalyzeResponse(status="error", error=f"[Frame Analysis] {e}")
 
+    # --- Evaluate speech rules against accumulated transcript (if provided) ---
+    speech_rules = [r for r in policy.rules if r.type == "speech"]
+    acc_transcript = request.accumulated_transcript or policy.accumulated_transcript
+    if speech_rules and acc_transcript:
+        from backend.services.speech_policy import evaluate_speech
+        from backend.models.schemas import TranscriptResult
+        # Build a minimal TranscriptResult from accumulated text
+        dummy_transcript = TranscriptResult(
+            full_text="",  # Current chunk has no audio — only accumulated
+            segments=[],
+            language="en",
+            duration=0.0,
+        )
+        try:
+            speech_verdicts = await evaluate_speech(
+                transcript=dummy_transcript,
+                speech_rules=speech_rules,
+                custom_prompt=policy.custom_prompt,
+                accumulated_transcript=acc_transcript,
+            )
+            report.all_verdicts.extend(speech_verdicts)
+            speech_incidents = [v for v in speech_verdicts if not v.compliant and v.mode == "incident"]
+            report.incidents.extend(speech_incidents)
+            if any(not v.compliant for v in speech_verdicts):
+                report.overall_compliant = False
+        except Exception as e:
+            logger.warning(f"Speech evaluation failed (non-fatal): {e}")
+
+        # Recompute checklist_fulfilled
+        checklist_verdicts = [v for v in report.all_verdicts if v.mode == "checklist"]
+        if checklist_verdicts:
+            report.checklist_fulfilled = all(v.compliant for v in checklist_verdicts)
+
     _assign_person_thumbnails(report)
 
     elapsed = time.perf_counter() - t0
@@ -469,6 +513,7 @@ async def analyze_frame(request: FrameAnalyzeRequest):
         f"📸 Frame analysis ({provider}): {elapsed:.2f}s"
         f" | {'COMPLIANT' if report.overall_compliant else 'NON-COMPLIANT'}"
         f" | {len(report.person_summaries)} people"
+        f" | speech_rules={len(speech_rules)}, transcript={len(acc_transcript) if acc_transcript else 0} chars"
     )
 
     return AnalyzeResponse(status="complete", report=report)
@@ -538,3 +583,64 @@ async def analyze_frames_parallel(request: ParallelBatchRequest):
     )
 
     return AnalyzeResponse(status="complete", report=report)
+
+
+# ---------------------------------------------------------------------------
+# Audio-only transcription endpoint (for background audio recording)
+# ---------------------------------------------------------------------------
+
+@router.post("/transcribe")
+async def transcribe_audio_endpoint(
+    form_data: FormData = Depends(_large_form),
+):
+    """Transcribe an audio blob using Whisper. Returns transcript text.
+
+    Lightweight endpoint for background audio recording during webcam monitoring.
+    Accepts an audio file (webm/wav/mp3) and returns the transcript.
+    """
+    t0 = time.perf_counter()
+    audio_file: UploadFile = form_data["audio"]
+    logger.info(f"🎙️ TRANSCRIBE REQUEST: {audio_file.filename}, {audio_file.content_type}")
+
+    # Save to temp file
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    file_path = os.path.join(UPLOAD_DIR, audio_file.filename or "audio.webm")
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(audio_file.file, f)
+
+    try:
+        transcript = await transcribe_video(file_path)
+    except Exception as e:
+        logger.error(f"❌ Transcription failed: {e}", exc_info=True)
+        return {"status": "error", "error": str(e), "transcript": None}
+    finally:
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+
+    elapsed = time.perf_counter() - t0
+
+    if transcript and transcript.full_text:
+        logger.info(f"🎙️ Transcribed: '{transcript.full_text[:80]}...' in {elapsed:.2f}s")
+        return {
+            "status": "ok",
+            "transcript": {
+                "full_text": transcript.full_text,
+                "segments": [{"start": s.start, "end": s.end, "text": s.text} for s in transcript.segments],
+                "language": transcript.language,
+                "duration": transcript.duration,
+            },
+        }
+    else:
+        logger.info(f"🎙️ No speech detected in {elapsed:.2f}s")
+        return {"status": "ok", "transcript": None}
+
+
+# ---------------------------------------------------------------------------
+# Reset compliance state (for session clear)
+# ---------------------------------------------------------------------------
+
+@router.post("/reset")
+async def reset_compliance_state():
+    """Reset all compliance state. Called when the user clears a monitoring session."""
+    compliance_tracker.reset()
+    return {"status": "ok"}

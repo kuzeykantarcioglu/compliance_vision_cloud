@@ -96,13 +96,15 @@ async def evaluate_speech(
     transcript: TranscriptResult,
     speech_rules: list[PolicyRule],
     custom_prompt: str = "",
+    accumulated_transcript: str = "",
 ) -> list[Verdict]:
     """Evaluate speech rules against a transcript.
 
     Args:
-        transcript: Whisper transcript with timestamped segments.
+        transcript: Whisper transcript with timestamped segments (current chunk).
         speech_rules: Only the rules with type="speech".
         custom_prompt: Additional context from the policy.
+        accumulated_transcript: Full transcript text accumulated from all prior chunks.
 
     Returns:
         List of Verdict objects for each speech rule.
@@ -112,9 +114,12 @@ async def evaluate_speech(
 
     logger.info(f"Evaluating {len(speech_rules)} speech rules against transcript")
 
-    if not transcript or not transcript.full_text:
+    # Build the full transcript: accumulated history + current chunk
+    current_text = transcript.full_text if transcript else ""
+    full_text = (accumulated_transcript + " " + current_text).strip() if accumulated_transcript else current_text
+
+    if not full_text:
         logger.warning("No audio transcript available — marking all speech rules as non-compliant")
-        # No transcript available — mark all speech rules as non-compliant
         return [
             Verdict(
                 rule_type="speech",
@@ -127,14 +132,25 @@ async def evaluate_speech(
             for rule in speech_rules
         ]
 
-    transcript_text = _format_transcript(transcript)
+    # Format combined transcript for the LLM
+    transcript_lines = ["FULL ACCUMULATED TRANSCRIPT (across all monitoring chunks):"]
+    if accumulated_transcript:
+        transcript_lines.append(f"  [Prior chunks] {accumulated_transcript}")
+    if transcript and transcript.segments:
+        transcript_lines.append("  [Current chunk]:")
+        for seg in transcript.segments:
+            transcript_lines.append(f"    [{seg.start:.1f}s - {seg.end:.1f}s] {seg.text.strip()}")
+    elif current_text:
+        transcript_lines.append(f"  [Current chunk] {current_text}")
+    transcript_text = "\n".join(transcript_lines)
+
     rules_text = _format_speech_rules(speech_rules, custom_prompt)
 
     user_prompt = f"""{rules_text}
 
 {transcript_text}
 
-Evaluate each speech rule against this transcript. Be precise — count exact phrase occurrences, quote relevant segments."""
+Evaluate each speech rule against the FULL ACCUMULATED transcript (all chunks combined). Be precise — count exact phrase occurrences across the entire session, quote relevant segments."""
 
     response = await client.chat.completions.create(
         model="gpt-4o-mini",
@@ -172,16 +188,24 @@ Evaluate each speech rule against this transcript. Be precise — count exact ph
             for rule in speech_rules
         ]
 
+    # Map rule descriptions to rule objects to carry over mode
+    rule_map = {rule.description: rule for rule in speech_rules}
+
     verdicts = []
     for v in data.get("verdicts", []):
-        logger.info(f"  Speech rule '{v.get('rule_description', '')[:50]}': {'COMPLIANT' if v.get('compliant') else 'NON-COMPLIANT'}")
+        rule_desc = v.get("rule_description", "")
+        rule = rule_map.get(rule_desc)
+        mode = rule.mode if rule else "incident"
+        logger.info(f"  Speech rule '{rule_desc[:50]}' [{mode}]: {'COMPLIANT' if v.get('compliant') else 'NON-COMPLIANT'}")
         verdicts.append(Verdict(
             rule_type=v.get("rule_type", "speech"),
-            rule_description=v.get("rule_description", ""),
+            rule_description=rule_desc,
             compliant=v.get("compliant", False),
             severity=v.get("severity", "medium"),
             reason=v.get("reason", ""),
             timestamp=v.get("timestamp"),
+            mode=mode,
+            checklist_status="compliant" if (mode == "checklist" and v.get("compliant")) else None,
         ))
 
     return verdicts

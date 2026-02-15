@@ -2,74 +2,67 @@ import { Circle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { healthCheck } from "../api";
 
+type Status = "connecting" | "online" | "offline";
+
+const statusConfig: Record<Status, { color: string; label: string; pulse: boolean }> = {
+  online:     { color: "#22c55e", label: "Online",  pulse: false },
+  connecting: { color: "#eab308", label: "Connecting", pulse: true },
+  offline:    { color: "#ef4444", label: "Offline", pulse: false },
+};
+
+const dgxConfig: Record<Status, { color: string; label: string; pulse: boolean }> = {
+  online:     { color: "#22c55e", label: "DGX",        pulse: false },
+  connecting: { color: "#eab308", label: "DGX",        pulse: true },
+  offline:    { color: "#ef4444", label: "DGX",        pulse: false },
+};
+
+function Dot({ color, pulse }: { color: string; pulse: boolean }) {
+  return (
+    <Circle
+      className={`w-2 h-2 fill-current shrink-0 ${pulse ? "animate-pulse" : ""}`}
+      style={{ color }}
+    />
+  );
+}
+
 export default function StatusIndicator() {
-  const [status, setStatus] = useState<"connecting" | "online" | "offline">("connecting");
-  const [dgxStatus, setDgxStatus] = useState<string | null>(null);
+  const [apiStatus, setApiStatus] = useState<Status>("connecting");
+  const [dgxStatus, setDgxStatus] = useState<Status>("connecting");
 
   useEffect(() => {
-    const checkStatus = async () => {
+    const check = async () => {
       try {
         const data = await healthCheck();
-        setStatus("online");
+        setApiStatus("online");
         if (data.dgx) {
-          setDgxStatus(data.dgx.status);
+          setDgxStatus(data.dgx.status === "connected" ? "online" : data.dgx.status === "checking" ? "connecting" : "offline");
+        } else {
+          setDgxStatus("offline");
         }
       } catch {
-        setStatus("offline");
+        setApiStatus("offline");
+        setDgxStatus("offline");
       }
     };
 
-    // Initial check
-    checkStatus();
-
-    // Check every 60 seconds (reduced from 5s to avoid log spam)
-    const interval = setInterval(checkStatus, 60_000);
-
+    check();
+    const interval = setInterval(check, 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusConfig = () => {
-    switch (status) {
-      case "online":
-        return {
-          color: "#22c55e", // green
-          text: "Online",
-          pulse: false,
-        };
-      case "connecting":
-        return {
-          color: "#eab308", // yellow
-          text: "Connecting...",
-          pulse: true,
-        };
-      case "offline":
-        return {
-          color: "#ef4444", // red
-          text: "Offline",
-          pulse: false,
-        };
-    }
-  };
-
-  const config = getStatusConfig();
-  const dgxColor = dgxStatus === "connected" ? "#22c55e" : dgxStatus === "checking" ? "#eab308" : "#ef4444";
-  const dgxLabel = dgxStatus === "connected" ? "DGX" : dgxStatus === "checking" ? "DGX..." : dgxStatus === "unreachable" ? "DGX ✗" : null;
+  const api = statusConfig[apiStatus];
+  const dgx = dgxConfig[dgxStatus];
 
   return (
-    <div className="flex items-center gap-2 text-[10px] font-medium">
-      <div className="flex items-center gap-1.5" style={{ color: config.color }}>
-        <Circle 
-          className={`w-2 h-2 fill-current ${config.pulse ? 'animate-pulse' : ''}`} 
-          style={{ color: config.color }}
-        />
-        {config.text}
+    <div className="flex items-center gap-2.5 text-[9px] font-medium mt-0.5">
+      <div className="flex items-center gap-1" style={{ color: api.color }}>
+        <Dot color={api.color} pulse={api.pulse} />
+        {api.label}
       </div>
-      {dgxLabel && (
-        <div className="flex items-center gap-1" style={{ color: dgxColor }}>
-          <Circle className="w-1.5 h-1.5 fill-current" style={{ color: dgxColor }} />
-          {dgxLabel}
-        </div>
-      )}
+      <div className="flex items-center gap-1" style={{ color: dgx.color }}>
+        <Dot color={dgx.color} pulse={dgx.pulse} />
+        {dgx.label}
+      </div>
     </div>
   );
 }

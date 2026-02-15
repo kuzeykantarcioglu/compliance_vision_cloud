@@ -1,11 +1,12 @@
 import { Plus, Trash2, ChevronDown, Mic, MicOff, Save, Download, Upload, X, Star, Image } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import type { Policy, PolicyRule } from "../types";
+import type { Policy, PolicyRule, AIProvider } from "../types";
 
 interface Props {
   policy: Policy;
   onChange: (policy: Policy) => void;
   disabled?: boolean;
+  provider?: AIProvider;
 }
 
 const STORAGE_KEY = "compliance_vision_presets";
@@ -97,7 +98,8 @@ function saveCustomPresets(presets: Record<string, Policy>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
 }
 
-export default function PolicyConfig({ policy, onChange, disabled }: Props) {
+export default function PolicyConfig({ policy, onChange, disabled, provider }: Props) {
+  const isDgx = provider === "dgx";
   const [showPresets, setShowPresets] = useState(false);
   const [customPresets, setCustomPresets] = useState<Record<string, Policy>>({});
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -412,19 +414,21 @@ export default function PolicyConfig({ policy, onChange, disabled }: Props) {
                   ))}
                 </select>
                 <select
-                  value={rule.mode || "incident"}
+                  value={isDgx ? "incident" : (rule.mode || "incident")}
                   onChange={(e) => updateRule(i, { mode: e.target.value as "incident" | "checklist" })}
-                  disabled={disabled}
+                  disabled={disabled || isDgx}
                   className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded border bg-transparent"
                   style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
-                  title="Compliance mode"
+                  title={isDgx ? "Only incident mode available with DGX" : "Compliance mode"}
                 >
                   <option value="incident" style={{ background: "var(--color-surface)" }}>
                     INCIDENT
                   </option>
-                  <option value="checklist" style={{ background: "var(--color-surface)" }}>
-                    CHECKLIST
-                  </option>
+                  {!isDgx && (
+                    <option value="checklist" style={{ background: "var(--color-surface)" }}>
+                      CHECKLIST
+                    </option>
+                  )}
                 </select>
                 {rule.mode === "checklist" ? (
                   <select

@@ -35,6 +35,8 @@ export interface Policy {
   enabled_reference_ids?: string[];
   /** Context from prior monitoring chunks about already-satisfied frequency rules. */
   prior_context?: string;
+  /** Full transcript accumulated across all prior monitoring chunks (for speech checklist rules). */
+  accumulated_transcript?: string;
 }
 
 export interface PersonDetail {
@@ -100,6 +102,7 @@ export interface Report {
   frame_observations: FrameObservation[];
   person_summaries: PersonSummary[];
   transcript: TranscriptResult | null;
+  checklist_fulfilled?: boolean | null;
   analyzed_at: string;
   total_frames_analyzed: number;
   video_duration: number;

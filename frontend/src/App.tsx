@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Scan, ScrollText, Image, Shield, Sparkles, Camera, Eye, Activity } from "lucide-react";
+import { Scan, ScrollText, Image, Shield, Sparkles, Camera, ShieldCheck, Activity } from "lucide-react";
 import type { ReferenceImage, AIProvider } from "./types";
 import StatusBar from "./components/Header";
 import StatusIndicator from "./components/StatusIndicator";
@@ -13,7 +13,7 @@ import PipelineStatus from "./components/PipelineStatus";
 import ReportView from "./components/ReportView";
 import LiveReportView from "./components/LiveReportView";
 import ProviderToggle from "./components/ProviderToggle";
-import { analyzeVideo, analyzeFrame, analyzeFrameBatch, analyzeFrameBatchParallel, healthCheck } from "./api";
+import { analyzeVideo, analyzeFrame, analyzeFrameBatch, analyzeFrameBatchParallel, transcribeAudio, resetComplianceState, healthCheck } from "./api";
 import type { Policy, Report, PipelineStage } from "./types";
 
 // Apply saved theme before first paint to avoid flash
@@ -71,6 +71,7 @@ export default function App() {
   const monitoringRef = useRef(false);
   const sessionIdRef = useRef(0); // incremented each session to discard stale in-flight results
   const liveReportsRef = useRef<Report[]>([]);
+  const accumulatedTranscriptRef = useRef<string>(""); // accumulated across audio chunks
 
   const [policy, setPolicy] = useState<Policy>(() => {
     const savedRefs = loadSavedReferences();
@@ -243,6 +244,17 @@ export default function App() {
     return lines.join("\n");
   }, []);
 
+  /** Build accumulated transcript text from all prior reports. */
+  const buildAccumulatedTranscript = useCallback((reports: Report[]): string => {
+    const texts: string[] = [];
+    for (const r of reports) {
+      if (r.transcript?.full_text) {
+        texts.push(r.transcript.full_text);
+      }
+    }
+    return texts.join(" ");
+  }, []);
+
   /** Upload + analyze a single chunk. Fire-and-forget friendly. */
   const analyzeChunk = useCallback(async (file: File, mySession: number) => {
     setLiveStage("uploading");
@@ -252,6 +264,12 @@ export default function App() {
     const priorCtx = buildPriorContext(liveReportsRef.current);
     if (priorCtx) {
       currentPolicy.prior_context = priorCtx;
+    }
+
+    // Accumulate transcript from all prior chunks for speech rules
+    const accTranscript = buildAccumulatedTranscript(liveReportsRef.current);
+    if (accTranscript) {
+      currentPolicy.accumulated_transcript = accTranscript;
     }
 
     const result = await analyzeVideo(file, currentPolicy, (s) => {
@@ -267,7 +285,7 @@ export default function App() {
       setLiveError(result.error || "Chunk analysis failed.");
       setLiveStage("error");
     }
-  }, [buildPriorContext]);
+  }, [buildPriorContext, buildAccumulatedTranscript]);
 
   /**
    * Capture a single JPEG frame from the live webcam video element.
@@ -351,6 +369,10 @@ export default function App() {
     if (priorCtx) {
       currentPolicy.prior_context = priorCtx;
     }
+    // Pass accumulated transcript for speech rule evaluation
+    if (accumulatedTranscriptRef.current) {
+      currentPolicy.accumulated_transcript = accumulatedTranscriptRef.current;
+    }
 
     const result = await analyzeFrame(imageBase64, currentPolicy, providerRef.current);
     if (!monitoringRef.current || sessionIdRef.current !== mySession) return false;
@@ -423,49 +445,121 @@ export default function App() {
   }, [buildPriorContext]);
 
   /**
-   * Frame-capture monitoring loop.
-   *
-   * Two modes depending on the selected AI provider:
-   *
-   * **OpenAI mode:** Tight loop — capture single JPEG → send to /analyze/frame → repeat.
-   *   ~2-4s per cycle with 3s rate-limit pacing.
-   *
-   * **DGX mode (PIPELINED):**
-   *   Captures frames continuously at 4fps. Sends batches to the backend
-   *   in parallel — multiple DGX requests can be in-flight simultaneously.
-   *   While waiting for DGX responses, keeps capturing frames for the next batch.
-   *   This maximizes throughput by overlapping capture and analysis.
-   *
-   * Includes exponential backoff on errors to avoid hammering the API.
+   * Background audio recording loop. Records audio-only chunks from the webcam
+   * stream and sends them to /analyze/transcribe. Accumulated transcript is stored
+   * in accumulatedTranscriptRef and passed with each frame analysis for speech rules.
+   */
+  const runAudioLoop = useCallback(async (mySession: number) => {
+    const AUDIO_CHUNK_MS = 8_000; // 8s audio chunks
+    console.log("[Audio] Starting background audio recording for speech rules");
+
+    while (monitoringRef.current && sessionIdRef.current === mySession) {
+      // Find the webcam stream
+      const videoEl = document.querySelector("video[autoplay]") as HTMLVideoElement | null;
+      if (!videoEl || !videoEl.srcObject) {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+      const stream = videoEl.srcObject as MediaStream;
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        console.warn("[Audio] No audio tracks available");
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+
+      // Create audio-only stream and record
+      const audioStream = new MediaStream(audioTracks);
+      const parts: Blob[] = [];
+      let mimeType = "audio/webm";
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) mimeType = "audio/webm;codecs=opus";
+      const recorder = new MediaRecorder(audioStream, { mimeType });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) parts.push(e.data); };
+
+      const blob = await new Promise<Blob>((resolve) => {
+        recorder.onstop = () => resolve(new Blob(parts, { type: mimeType }));
+        recorder.start();
+        setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, AUDIO_CHUNK_MS);
+      });
+
+      if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+      if (blob.size < 1000) continue; // skip tiny/silent chunks
+
+      // Send to transcription endpoint (non-blocking for the visual loop)
+      console.log(`[Audio] Sending ${(blob.size / 1024).toFixed(1)}KB audio for transcription`);
+      const result = await transcribeAudio(blob);
+      if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+
+      if (result.status === "ok" && result.transcript?.full_text) {
+        const newText = result.transcript.full_text;
+        accumulatedTranscriptRef.current = (accumulatedTranscriptRef.current + " " + newText).trim();
+        console.log(`[Audio] Transcribed: "${newText}" | Total: ${accumulatedTranscriptRef.current.length} chars`);
+
+        // Also inject transcript into liveReports for the transcript feed UI
+        const transcriptReport: Report = {
+          video_id: `audio-${Date.now()}`,
+          summary: "",
+          overall_compliant: true,
+          incidents: [],
+          all_verdicts: [],
+          recommendations: [],
+          frame_observations: [],
+          person_summaries: [],
+          transcript: {
+            full_text: newText,
+            segments: result.transcript.segments || [],
+            language: result.transcript.language || "en",
+            duration: result.transcript.duration || 0,
+          },
+          analyzed_at: new Date().toISOString(),
+          total_frames_analyzed: 0,
+          video_duration: 0,
+        };
+        setLiveReports((prev) => [...prev, transcriptReport]);
+      }
+
+      // Brief pause before next audio chunk
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    console.log("[Audio] Background audio loop stopped");
+  }, []);
+
+  /**
+   * Main monitoring loop — always uses fast frame capture for visual analysis.
+   * If speech rules are present, also starts a background audio recording loop.
    */
   const runMonitoringLoop = useCallback(async () => {
     const mySession = sessionIdRef.current;
     let consecutiveErrors = 0;
     const isDgx = providerRef.current === "dgx";
+    const hasSpeechRules = policyRef.current.rules.some(r => r.type === "speech");
 
     // DGX: capture parameters
     const DGX_FPS = 4;
-    const DGX_FRAME_INTERVAL_MS = 1000 / DGX_FPS; // 250ms
-    const DGX_FRAMES_PER_BATCH = 4; // 4 frames = 1 second clip per batch
-    const DGX_BATCHES_PER_CYCLE = 3; // 3 concurrent batches = 3 seconds coverage
-    const DGX_TOTAL_FRAMES = DGX_FRAMES_PER_BATCH * DGX_BATCHES_PER_CYCLE; // 12 frames
+    const DGX_FRAME_INTERVAL_MS = 1000 / DGX_FPS;
+    const DGX_FRAMES_PER_BATCH = 4;
+    const DGX_BATCHES_PER_CYCLE = 3;
+    const DGX_TOTAL_FRAMES = DGX_FRAMES_PER_BATCH * DGX_BATCHES_PER_CYCLE;
 
-    const BASE_DELAY_MS = isDgx ? 200 : 3_000; // Much shorter delay for DGX — pipelined
+    const BASE_DELAY_MS = isDgx ? 200 : 3_000;
     const MAX_BACKOFF_MS = isDgx ? 10_000 : 30_000;
 
-    // Track in-flight DGX requests for pipelining
     const inFlightRequests: Set<Promise<boolean>> = new Set();
-    const MAX_IN_FLIGHT = 2; // Max parallel analysis cycles
+    const MAX_IN_FLIGHT = 2;
 
     // Wait a bit for webcam to fully initialize
     await new Promise((r) => setTimeout(r, 1000));
 
+    // Start background audio recording if speech rules exist
+    if (hasSpeechRules) {
+      runAudioLoop(mySession); // fire-and-forget — runs in parallel
+    }
+
     while (monitoringRef.current && sessionIdRef.current === mySession) {
       if (isDgx) {
-        // --- DGX PIPELINED mode: capture + analyze overlap ---
+        // --- DGX PIPELINED mode ---
         setLiveStage("capturing" as any);
 
-        // Capture frames continuously
         const allFrames: string[] = [];
         for (let i = 0; i < DGX_TOTAL_FRAMES; i++) {
           if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
@@ -479,39 +573,25 @@ export default function App() {
         if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
 
         if (allFrames.length === 0) {
-          console.log("Webcam not ready, waiting...");
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
 
-        // Split into sub-batches for parallel processing
         const batches: string[][] = [];
         for (let i = 0; i < allFrames.length; i += DGX_FRAMES_PER_BATCH) {
           const batch = allFrames.slice(i, i + DGX_FRAMES_PER_BATCH);
           if (batch.length > 0) batches.push(batch);
         }
 
-        console.log(`[DGX] Captured ${allFrames.length} frames → ${batches.length} parallel batches`);
-
-        // Wait if too many requests are in-flight to avoid overloading
         while (inFlightRequests.size >= MAX_IN_FLIGHT) {
           await Promise.race([...inFlightRequests]);
         }
 
-        // Fire parallel analysis (don't await — pipeline with next capture)
-        const analysisPromise = (async (): Promise<boolean> => {
-          const success = await analyzeDgxParallel(batches, mySession);
-          return success;
-        })();
-
-        // Track this in-flight request
+        const analysisPromise = analyzeDgxParallel(batches, mySession);
         const trackedPromise = analysisPromise.then((success) => {
           inFlightRequests.delete(trackedPromise);
-          if (!success) {
-            consecutiveErrors++;
-          } else {
-            consecutiveErrors = 0;
-          }
+          if (!success) consecutiveErrors++;
+          else consecutiveErrors = 0;
           return success;
         }).catch(() => {
           inFlightRequests.delete(trackedPromise);
@@ -520,10 +600,8 @@ export default function App() {
         });
         inFlightRequests.add(trackedPromise);
 
-        // Brief pause — but much shorter than before since we're pipelining
         if (consecutiveErrors > 0) {
           const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
-          console.warn(`[DGX] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
           await new Promise((r) => setTimeout(r, backoff));
         } else {
           await new Promise((r) => setTimeout(r, BASE_DELAY_MS));
@@ -533,12 +611,10 @@ export default function App() {
         // --- OpenAI mode: single frame per request ---
         const frameBase64 = captureFrame();
         if (!frameBase64) {
-          console.log("Webcam not ready, waiting...");
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
 
-        console.log(`Captured frame: ${frameBase64.length} chars (provider: ${providerRef.current})`);
         if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
 
         const success = await analyzeFrameChunk(frameBase64, mySession);
@@ -547,7 +623,6 @@ export default function App() {
         if (!success) {
           consecutiveErrors++;
           const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
-          console.warn(`[Monitor] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
           await new Promise((r) => setTimeout(r, backoff));
         } else {
           consecutiveErrors = 0;
@@ -556,12 +631,10 @@ export default function App() {
       }
     }
 
-    // Wait for any remaining in-flight requests to complete
     if (inFlightRequests.size > 0) {
-      console.log(`[DGX] Waiting for ${inFlightRequests.size} in-flight requests...`);
       await Promise.allSettled([...inFlightRequests]);
     }
-  }, [captureFrame, analyzeFrameChunk, analyzeDgxBatch, analyzeDgxParallel]);
+  }, [captureFrame, analyzeFrameChunk, analyzeDgxParallel, runAudioLoop]);
 
   const canStartMonitoring =
     (policy.rules.length > 0 || policy.custom_prompt.trim().length > 0) &&
@@ -574,6 +647,8 @@ export default function App() {
     monitoringRef.current = true;
     setLiveReports([]);
     liveReportsRef.current = [];
+    accumulatedTranscriptRef.current = ""; // reset transcript for new session
+    resetComplianceState(); // reset backend checklist state
     setSessionStart(Date.now());
     setChunksProcessed(0);
     setLiveStage("idle");
@@ -610,18 +685,16 @@ export default function App() {
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-20 blur-xl" />
-                <div className="relative p-2 bg-gradient-to-br from-blue-500 to-purple-600" style={{ borderRadius: "4px" }}>
-                  <Eye className="w-5 h-5 text-white" />
+                <div className="absolute inset-0 opacity-20 blur-xl" style={{ background: "var(--color-text)" }} />
+                <div className="relative p-2" style={{ borderRadius: "4px", background: "var(--color-text)" }}>
+                  <ShieldCheck className="w-5 h-5" style={{ color: "var(--color-bg)" }} />
                 </div>
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold tracking-tight" style={{ color: "var(--color-text)" }}>
-                    Compliance Vision
-                  </span>
-                  <StatusIndicator />
-                </div>
+                <span className="text-sm font-bold tracking-tight" style={{ color: "var(--color-text)" }}>
+                  Agent 00Vision
+                </span>
+                <StatusIndicator />
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -697,6 +770,7 @@ export default function App() {
                 policy={policy}
                 onChange={handlePolicyChange}
                 disabled={isFileRunning || isMonitoring}
+                provider={provider}
               />
 
               {inputMode === "file" && (
@@ -745,7 +819,7 @@ export default function App() {
 
               {inputMode === "webcam" && !isMonitoring && liveReports.length > 0 && (
                 <button
-                  onClick={() => { sessionIdRef.current += 1; setLiveReports([]); setSessionStart(null); setChunksProcessed(0); }}
+                  onClick={() => { sessionIdRef.current += 1; setLiveReports([]); liveReportsRef.current = []; accumulatedTranscriptRef.current = ""; resetComplianceState(); setSessionStart(null); setChunksProcessed(0); }}
                   className="w-full text-xs py-2 rounded border border-dashed hover:bg-black/5 transition-colors"
                   style={{ borderColor: "var(--color-border)", color: "var(--color-text-dim)" }}
                 >

@@ -1,0 +1,1303 @@
+INFO:     Will watch for changes in these directories: ['/Users/kuzeykantarcioglu/treehacks2026']
+INFO:     Uvicorn running on http://0.0.0.0:8082 (Press CTRL+C to quit)
+INFO:     Started reloader process [24743] using WatchFiles
+2026-02-15 08:37:16,075 backend.services.compliance_state INFO: No saved compliance state found — starting fresh.
+2026-02-15 08:37:16,177 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [24751]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:37:16,567 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:62505 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62623 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62662 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62691 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:39:16,461 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:39:16,463 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:39:21,581 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:39:21,593 backend.services.policy INFO: Combined analysis response received (784 chars)
+2026-02-15 08:39:21,594 backend.services.compliance_state INFO: ✅ Checklist compliance updated for unknown on rule: Person at the forefront must be wearing a dark gre (valid until forever)
+2026-02-15 08:39:21,595 backend.services.compliance_state INFO: ✅ Checklist compliance updated for unknown on rule: Person with the badge must be waving (valid until forever)
+2026-02-15 08:39:21,595 backend.services.compliance_state INFO: ✅ Checklist compliance updated for unknown on rule: Only persons with the tree-shaped badge should be  (valid until forever)
+2026-02-15 08:39:21,596 backend.routers.analyze INFO: 📸 Frame analysis (openai): 5.13s | COMPLIANT | 1 people
+INFO:     127.0.0.1:62712 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:39:24,627 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:39:24,628 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:39:28,375 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:39:28,377 backend.services.policy INFO: Combined analysis response received (489 chars)
+2026-02-15 08:39:28,378 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.75s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62718 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:39:31,415 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:39:31,415 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:39:34,835 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:39:34,837 backend.services.policy INFO: Combined analysis response received (487 chars)
+2026-02-15 08:39:34,837 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.42s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62722 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:39:37,869 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:39:37,870 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:39:41,779 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:39:41,781 backend.services.policy INFO: Combined analysis response received (497 chars)
+2026-02-15 08:39:41,782 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.91s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62726 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:39:44,819 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:39:44,820 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:39:45,440 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:39:45,441 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:62740 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:40:10,004 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:40:10,007 backend.services.policy INFO: Combined analysis response received (501 chars)
+2026-02-15 08:40:10,007 backend.routers.analyze INFO: 📸 Frame analysis (openai): 25.19s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62730 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:40:13,032 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:40:13,033 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:40:13,124 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:40:13,124 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:40:38,279 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:40:38,283 backend.services.policy INFO: Combined analysis response received (512 chars)
+2026-02-15 08:40:38,283 backend.routers.analyze INFO: 📸 Frame analysis (openai): 25.25s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62757 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:40:41,319 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:40:41,320 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:40:43,950 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:40:43,952 backend.services.policy INFO: Combined analysis response received (487 chars)
+2026-02-15 08:40:43,953 backend.routers.analyze INFO: 📸 Frame analysis (openai): 2.63s | COMPLIANT | 1 people
+INFO:     127.0.0.1:62772 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:40:46,989 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:40:46,990 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:40:47,162 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:40:47,163 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:62789 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:41:11,751 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:41:11,753 backend.services.policy INFO: Combined analysis response received (487 chars)
+2026-02-15 08:41:11,754 backend.routers.analyze INFO: 📸 Frame analysis (openai): 24.76s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62775 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:41:14,795 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:41:14,795 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:41:20,673 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:41:20,675 backend.services.policy INFO: Combined analysis response received (489 chars)
+2026-02-15 08:41:20,675 backend.routers.analyze INFO: 📸 Frame analysis (openai): 5.88s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62805 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:41:23,709 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:41:23,710 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:41:23,808 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:41:23,809 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:41:48,356 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:41:48,359 backend.services.policy INFO: Combined analysis response received (516 chars)
+2026-02-15 08:41:48,359 backend.routers.analyze INFO: 📸 Frame analysis (openai): 24.65s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62810 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:41:51,388 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:41:51,389 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:41:55,091 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:41:55,092 backend.services.policy INFO: Combined analysis response received (505 chars)
+2026-02-15 08:41:55,092 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.70s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62840 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:41:58,117 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:41:58,117 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:41:58,211 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:41:58,212 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:62845 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:42:21,972 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:42:21,975 backend.services.policy INFO: Combined analysis response received (514 chars)
+2026-02-15 08:42:21,975 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.86s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62842 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:42:25,012 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:42:25,013 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:42:25,103 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:42:25,104 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:42:48,962 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:42:48,968 backend.services.policy INFO: Combined analysis response received (487 chars)
+2026-02-15 08:42:48,968 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.96s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62869 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:42:52,000 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:42:52,000 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:42:52,183 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:42:52,183 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:62893 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:43:18,015 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:43:18,018 backend.services.policy INFO: Combined analysis response received (499 chars)
+2026-02-15 08:43:18,018 backend.routers.analyze INFO: 📸 Frame analysis (openai): 26.02s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62889 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:43:21,051 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:43:21,052 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:43:24,617 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:43:24,619 backend.services.policy INFO: Combined analysis response received (489 chars)
+2026-02-15 08:43:24,620 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.57s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62914 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:43:27,660 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:43:27,661 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:43:27,838 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:43:27,839 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:43:51,462 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:43:51,464 backend.services.policy INFO: Combined analysis response received (489 chars)
+2026-02-15 08:43:51,464 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.80s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62921 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:43:54,498 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:43:54,498 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:43:54,608 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:43:54,608 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:62943 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:44:19,245 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:44:19,248 backend.services.policy INFO: Combined analysis response received (487 chars)
+2026-02-15 08:44:19,248 backend.routers.analyze INFO: 📸 Frame analysis (openai): 24.75s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62938 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:44:22,276 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:44:22,277 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:44:25,607 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:44:25,609 backend.services.policy INFO: Combined analysis response received (514 chars)
+2026-02-15 08:44:25,610 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.33s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62980 - "POST /analyze/frame HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/services/dgx.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24751]
+2026-02-15 08:44:27,782 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:44:27,899 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25204]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:44:28,642 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:44:28,642 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:44:28,905 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:44:28,906 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+WARNING:  WatchFiles detected changes in 'backend/services/dgx.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+2026-02-15 08:44:52,818 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:44:52,826 backend.services.policy INFO: Combined analysis response received (499 chars)
+2026-02-15 08:44:52,827 backend.routers.analyze INFO: 📸 Frame analysis (openai): 24.18s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:62988 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25204]
+WARNING:  WatchFiles detected changes in 'backend/services/dgx.py'. Reloading...
+2026-02-15 08:44:53,397 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:44:53,505 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25238]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'backend/services/dgx.py'. Reloading...
+2026-02-15 08:44:53,883 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:44:53,955 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25239]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:44:54,316 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:44:54,382 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25240]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:44:55,862 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:44:55,863 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+WARNING:  WatchFiles detected changes in 'backend/services/dgx.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+2026-02-15 08:44:59,568 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:44:59,575 backend.services.policy INFO: Combined analysis response received (516 chars)
+2026-02-15 08:44:59,575 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.71s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63013 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25240]
+2026-02-15 08:45:00,103 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:45:00,174 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25251]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:45:00,207 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+WARNING:  WatchFiles detected changes in 'backend/services/dgx.py'. Reloading...
+INFO:     127.0.0.1:63020 - "GET /health HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25251]
+2026-02-15 08:45:06,755 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:45:06,829 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25262]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:45:09,253 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:45:09,253 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+WARNING:  WatchFiles detected changes in 'backend/models/schemas.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+2026-02-15 08:45:12,886 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:45:12,897 backend.services.policy INFO: Combined analysis response received (614 chars)
+2026-02-15 08:45:12,898 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.65s | NON-COMPLIANT | 2 people
+INFO:     127.0.0.1:63037 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25262]
+2026-02-15 08:45:13,339 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:45:13,407 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25282]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:45:15,938 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:45:15,939 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:45:20,526 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:45:20,534 backend.services.policy INFO: Combined analysis response received (516 chars)
+2026-02-15 08:45:20,534 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.60s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63050 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:45:23,569 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:45:23,570 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:45:23,755 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:45:23,757 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+WARNING:  WatchFiles detected changes in 'backend/services/policy.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+2026-02-15 08:45:43,877 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:45:43,878 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:46:06,898 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:46:06,901 backend.services.policy INFO: Combined analysis response received (516 chars)
+2026-02-15 08:46:06,901 backend.routers.analyze INFO: 📸 Frame analysis (openai): 43.33s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63063 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25282]
+WARNING:  WatchFiles detected changes in 'backend/services/policy.py'. Reloading...
+2026-02-15 08:46:07,537 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:46:07,650 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25351]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:46:08,008 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 3 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:46:08,074 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [25355]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:46:08,112 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:63079 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63128 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63166 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:48:43,187 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:48:43,188 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:48:47,679 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:48:47,690 backend.services.policy INFO: Combined analysis response received (837 chars)
+2026-02-15 08:48:47,691 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.50s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63208 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:48:50,724 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:48:50,724 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:48:54,807 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:48:54,809 backend.services.policy INFO: Combined analysis response received (865 chars)
+2026-02-15 08:48:54,810 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.09s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63218 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:48:57,843 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:48:57,844 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:49:02,474 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:49:02,477 backend.services.policy INFO: Combined analysis response received (904 chars)
+2026-02-15 08:49:02,477 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.63s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63222 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:49:05,509 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:49:05,509 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:49:09,556 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:49:09,558 backend.services.policy INFO: Combined analysis response received (482 chars)
+2026-02-15 08:49:09,559 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.05s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63226 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:49:12,590 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:49:12,590 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:49:12,673 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:49:12,675 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:63237 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:49:35,343 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:49:35,345 backend.services.policy INFO: Combined analysis response received (487 chars)
+2026-02-15 08:49:35,346 backend.routers.analyze INFO: 📸 Frame analysis (openai): 22.76s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63232 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:49:52,298 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:49:52,298 backend.services.policy INFO: Combined analysis: 1 frames, 3 rules
+2026-02-15 08:49:56,188 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:49:56,190 backend.services.policy INFO: Combined analysis response received (804 chars)
+2026-02-15 08:49:56,191 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.89s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63265 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:50:18,639 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:50:18,639 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+INFO:     127.0.0.1:63289 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:50:27,106 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:50:27,108 backend.services.policy INFO: Combined analysis response received (715 chars)
+2026-02-15 08:50:27,108 backend.routers.analyze INFO: 📸 Frame analysis (openai): 8.47s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63286 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:50:30,138 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:50:30,139 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:50:33,675 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:50:33,677 backend.services.policy INFO: Combined analysis response received (707 chars)
+2026-02-15 08:50:33,677 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.54s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63303 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:50:36,718 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:50:36,719 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:50:40,403 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:50:40,407 backend.services.policy INFO: Combined analysis response received (699 chars)
+2026-02-15 08:50:40,407 backend.services.compliance_state INFO: ✅ Checklist compliance updated for unknown on rule: Person on foreground with the badge must be waving (valid until forever)
+2026-02-15 08:50:40,409 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.69s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63308 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:50:43,444 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:50:43,444 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:50:46,791 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:50:46,793 backend.services.policy INFO: Combined analysis response received (664 chars)
+2026-02-15 08:50:46,794 backend.services.compliance_state INFO: ✅ Checklist compliance updated for unknown on rule: Person on foreground must be wearing a dark green, (valid until forever)
+2026-02-15 08:50:46,795 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.35s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63312 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:50:49,822 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:50:49,822 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:50:49,918 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:50:49,919 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:51:10,063 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:51:10,064 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:63331 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:51:33,348 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:51:33,351 backend.services.policy INFO: Combined analysis response received (664 chars)
+2026-02-15 08:51:33,352 backend.routers.analyze INFO: 📸 Frame analysis (openai): 43.53s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63316 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:51:36,383 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:51:36,384 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:51:36,559 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:51:36,560 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:51:59,575 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:51:59,578 backend.services.policy INFO: Combined analysis response received (659 chars)
+2026-02-15 08:51:59,579 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.20s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63351 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:52:02,618 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:52:02,618 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:52:02,861 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:52:02,862 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:63380 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:52:30,764 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:52:30,767 backend.services.policy INFO: Combined analysis response received (672 chars)
+2026-02-15 08:52:30,768 backend.routers.analyze INFO: 📸 Frame analysis (openai): 28.15s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63372 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:52:33,803 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:52:33,803 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:52:38,199 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:52:38,201 backend.services.policy INFO: Combined analysis response received (644 chars)
+2026-02-15 08:52:38,202 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.40s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63402 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:52:41,230 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:52:41,231 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:52:41,329 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:52:41,330 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:53:06,415 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:53:06,418 backend.services.policy INFO: Combined analysis response received (661 chars)
+2026-02-15 08:53:06,418 backend.routers.analyze INFO: 📸 Frame analysis (openai): 25.19s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63407 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:53:09,450 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:53:09,450 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:53:13,486 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:53:13,488 backend.services.policy INFO: Combined analysis response received (695 chars)
+2026-02-15 08:53:13,488 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.04s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63434 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:53:16,518 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:53:16,519 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 08:53:16,623 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:53:16,623 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:63447 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:53:40,341 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:53:40,343 backend.services.policy INFO: Combined analysis response received (722 chars)
+2026-02-15 08:53:40,344 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.83s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63443 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:53:47,050 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:53:47,050 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:53:50,456 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:53:50,459 backend.services.policy INFO: Combined analysis response received (509 chars)
+2026-02-15 08:53:50,459 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.41s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63473 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:53:53,491 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:53:53,491 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:53:53,584 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:53:53,585 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:54:16,694 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:54:16,697 backend.services.policy INFO: Combined analysis response received (505 chars)
+2026-02-15 08:54:16,697 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.21s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63481 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:54:19,729 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:54:19,729 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:54:19,829 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:54:19,830 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:63504 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:54:42,608 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:54:42,610 backend.services.policy INFO: Combined analysis response received (482 chars)
+2026-02-15 08:54:42,610 backend.routers.analyze INFO: 📸 Frame analysis (openai): 22.88s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63501 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:54:45,640 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:54:45,640 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:54:48,379 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:54:48,381 backend.services.policy INFO: Combined analysis response received (535 chars)
+2026-02-15 08:54:48,381 backend.routers.analyze INFO: 📸 Frame analysis (openai): 2.74s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63527 - "POST /analyze/frame HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/services/policy.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25355]
+2026-02-15 08:55:00,971 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:55:01,091 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26139]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:55:09,926 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:55:09,927 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:55:12,901 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:55:12,912 backend.services.policy INFO: Combined analysis response received (444 chars)
+2026-02-15 08:55:12,913 backend.routers.analyze INFO: 📸 Frame analysis (openai): 2.99s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:63546 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:55:15,945 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:55:15,947 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:55:16,715 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:55:16,716 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:55:21,111 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:63556 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 08:55:31,595 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:55:31,595 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:55:34,777 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:55:34,780 backend.services.policy INFO: Combined analysis response received (482 chars)
+2026-02-15 08:55:34,780 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.19s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63571 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:55:36,827 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:55:36,828 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:55:37,809 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 08:55:37,810 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 08:55:37,889 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 08:55:37,890 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+2026-02-15 08:55:59,685 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:55:59,687 backend.services.policy INFO: Combined analysis response received (509 chars)
+2026-02-15 08:55:59,688 backend.routers.analyze INFO: 📸 Frame analysis (openai): 43.74s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63552 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 08:56:01,111 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 08:56:01,114 backend.services.policy INFO: Combined analysis response received (521 chars)
+2026-02-15 08:56:01,114 backend.routers.analyze INFO: 📸 Frame analysis (openai): 23.31s | COMPLIANT | 1 people
+INFO:     127.0.0.1:63576 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63605 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63635 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63685 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63719 - "GET /health HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/models/schemas.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26139]
+2026-02-15 08:59:39,075 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:59:39,186 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26504]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 08:59:42,331 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:63763 - "GET /health HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/services/speech_policy.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26504]
+2026-02-15 08:59:58,046 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 08:59:58,149 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26525]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26525]
+2026-02-15 09:00:04,792 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:00:04,853 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26535]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:00:26,438 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:63801 - "GET /health HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/services/speech_policy.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26535]
+2026-02-15 09:00:53,438 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:00:53,548 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26592]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26592]
+2026-02-15 09:01:08,818 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:01:08,921 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26606]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26606]
+2026-02-15 09:01:18,178 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:01:18,240 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26615]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:01:26,553 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:63865 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63907 - "GET /health HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/main.py'. Reloading...
+INFO:     127.0.0.1:63953 - "GET /health HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26615]
+2026-02-15 09:02:58,098 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:02:58,199 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [26736]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:03:51,457 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:64004 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:04:02,495 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:04:02,496 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 09:04:07,163 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:04:07,174 backend.services.policy INFO: Combined analysis response received (524 chars)
+2026-02-15 09:04:07,175 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.68s | COMPLIANT | 1 people
+INFO:     127.0.0.1:64019 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:04:10,207 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:04:10,208 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 09:04:14,343 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:04:14,346 backend.services.policy INFO: Combined analysis response received (524 chars)
+2026-02-15 09:04:14,347 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.14s | COMPLIANT | 1 people
+INFO:     127.0.0.1:64031 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:04:17,373 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:04:17,374 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 09:04:20,817 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:04:20,857 backend.services.policy INFO: Combined analysis response received (515 chars)
+2026-02-15 09:04:20,857 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.48s | COMPLIANT | 1 people
+INFO:     127.0.0.1:64044 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:04:23,890 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:04:23,890 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 09:04:27,174 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:04:27,176 backend.services.policy INFO: Combined analysis response received (505 chars)
+2026-02-15 09:04:27,176 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.29s | COMPLIANT | 1 people
+INFO:     127.0.0.1:64052 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:04:30,202 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:04:30,202 backend.services.policy INFO: Combined analysis: 1 frames, 1 rules
+2026-02-15 09:04:30,412 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2026-02-15 09:04:30,413 openai._base_client INFO: Retrying request to /chat/completions in 20.000000 seconds
+INFO:     127.0.0.1:64079 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:05:01,309 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:05:01,309 backend.services.policy INFO: Combined analysis response received (527 chars)
+2026-02-15 09:05:01,309 backend.routers.analyze INFO: 📸 Frame analysis (openai): 31.11s | COMPLIANT | 1 people
+INFO:     127.0.0.1:64132 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64167 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64203 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64261 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:08:58,074 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:08:58,075 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:09:02,709 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:09:02,712 backend.services.policy INFO: Combined analysis response received (703 chars)
+2026-02-15 09:09:02,713 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.64s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:64289 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:09:05,746 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:09:05,746 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:09:10,005 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:09:10,009 backend.services.policy INFO: Combined analysis response received (668 chars)
+2026-02-15 09:09:10,009 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.26s | COMPLIANT | 1 people
+INFO:     127.0.0.1:64296 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64314 - "GET /health HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'backend/models/schemas.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26736]
+2026-02-15 09:10:03,161 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:10:03,277 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [27146]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:10:13,981 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:10:13,982 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:10:18,943 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:10:18,957 backend.services.policy INFO: Combined analysis response received (711 chars)
+2026-02-15 09:10:18,958 backend.routers.analyze INFO: 📸 Frame analysis (openai): 4.98s | NON-COMPLIANT | 1 people
+INFO:     127.0.0.1:64354 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:10:21,979 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:10:21,979 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:10:25,028 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:10:25,029 backend.services.policy INFO: Combined analysis response received (343 chars)
+2026-02-15 09:10:25,029 backend.routers.analyze INFO: 📸 Frame analysis (openai): 3.05s | COMPLIANT | 1 people
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+INFO:     127.0.0.1:64361 - "POST /analyze/frame HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27146]
+2026-02-15 09:10:25,760 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:10:25,864 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [27169]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:10:26,924 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:64367 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:10:32,969 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:10:32,970 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:10:32,970 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:10:32,970 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:10:33,018 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 78768 chars base64  [decode=0.017s, encode=0.030s]
+2026-02-15 09:10:33,018 backend.services.dgx INFO: 🚀 [09:10:33] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 78790 chars base64
+2026-02-15 09:10:33,018 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:10:33,019 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:10:33,031 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 79996 chars base64  [decode=0.005s, encode=0.007s]
+2026-02-15 09:10:33,031 backend.services.dgx INFO: 🚀 [09:10:33] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 80018 chars base64
+2026-02-15 09:10:33,031 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:10:33,031 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:10:33,042 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 82536 chars base64  [decode=0.004s, encode=0.006s]
+2026-02-15 09:10:33,042 backend.services.dgx INFO: 🚀 [09:10:33] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 82558 chars base64
+2026-02-15 09:10:34,524 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:10:34,524 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:10:34,525 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:10:34,525 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:10:34,546 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 80544 chars base64  [decode=0.009s, encode=0.012s]
+2026-02-15 09:10:34,546 backend.services.dgx INFO: 🚀 [09:10:34] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 80566 chars base64
+2026-02-15 09:10:34,546 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:10:34,547 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:10:34,563 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 79344 chars base64  [decode=0.006s, encode=0.010s]
+2026-02-15 09:10:34,563 backend.services.dgx INFO: 🚀 [09:10:34] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 79366 chars base64
+2026-02-15 09:10:34,563 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:10:34,564 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:10:34,577 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 77408 chars base64  [decode=0.006s, encode=0.007s]
+2026-02-15 09:10:34,577 backend.services.dgx INFO: 🚀 [09:10:34] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 77430 chars base64
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)
+2026-02-15 09:11:22,311 backend.services.dgx INFO: 📥 [09:11:22] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 49.3s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:22,313 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:22,313 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:26,369 backend.services.dgx INFO: 📥 [09:11:26] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 51.8s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:26,369 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:26,370 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:30,292 backend.services.dgx INFO: 📥 [09:11:30] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 55.7s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:30,293 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:30,293 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:34,187 backend.services.dgx INFO: 📥 [09:11:34] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 61.2s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:34,187 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:34,187 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:38,467 backend.services.dgx INFO: 📥 [09:11:38] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 65.4s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:38,468 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:38,468 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:38,469 backend.services.dgx INFO: 🏁 DGX PARALLEL complete: 3/3 succeeded in 65.5s total | NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:38,469 backend.routers.analyze INFO: 🏁 Parallel DGX: 65.50s | NON-COMPLIANT | 0 people | 3 batches → 12 total frames
+2026-02-15 09:11:42,250 backend.services.dgx INFO: 📥 [09:11:42] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 67.7s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:42,250 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:11:42,251 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:42,251 backend.services.dgx INFO: 🏁 DGX PARALLEL complete: 3/3 succeeded in 67.7s total | NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:11:42,251 backend.routers.analyze INFO: 🏁 Parallel DGX: 67.73s | NON-COMPLIANT | 0 people | 3 batches → 12 total frames
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27169]
+2026-02-15 09:11:42,929 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:11:43,042 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [27243]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:11:43,268 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:64416 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64491 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64515 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:13:24,934 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:13:24,935 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:13:24,935 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:13:24,935 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:13:24,958 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 135656 chars base64  [decode=0.007s, encode=0.016s]
+2026-02-15 09:13:24,958 backend.services.dgx INFO: 🚀 [09:13:24] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 135678 chars base64
+2026-02-15 09:13:24,960 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:13:24,960 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:13:24,976 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 125088 chars base64  [decode=0.007s, encode=0.009s]
+2026-02-15 09:13:24,977 backend.services.dgx INFO: 🚀 [09:13:24] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 125110 chars base64
+2026-02-15 09:13:24,977 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:13:24,977 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:13:24,990 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 127576 chars base64  [decode=0.005s, encode=0.008s]
+2026-02-15 09:13:24,990 backend.services.dgx INFO: 🚀 [09:13:24] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 127598 chars base64
+2026-02-15 09:13:28,040 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:13:28,040 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:13:28,041 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:13:28,041 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:13:28,065 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 127052 chars base64  [decode=0.009s, encode=0.015s]
+2026-02-15 09:13:28,065 backend.services.dgx INFO: 🚀 [09:13:28] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 127074 chars base64
+2026-02-15 09:13:28,066 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:13:28,066 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:13:28,083 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 102528 chars base64  [decode=0.007s, encode=0.010s]
+2026-02-15 09:13:28,083 backend.services.dgx INFO: 🚀 [09:13:28] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 102550 chars base64
+2026-02-15 09:13:28,084 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:13:28,084 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:13:28,097 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 83776 chars base64  [decode=0.005s, encode=0.008s]
+2026-02-15 09:13:28,097 backend.services.dgx INFO: 🚀 [09:13:28] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 83798 chars base64
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+2026-02-15 09:14:10,548 backend.services.dgx INFO: 📥 [09:14:10] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 45.6s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:10,550 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:10,550 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:15,856 backend.services.dgx INFO: 📥 [09:14:15] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 47.8s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:15,857 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:15,857 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:20,179 backend.services.dgx INFO: 📥 [09:14:20] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 55.2s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:20,179 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:20,179 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:25,815 backend.services.dgx INFO: 📥 [09:14:25] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 57.7s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:25,815 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:25,816 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:29,603 backend.services.dgx INFO: 📥 [09:14:29] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 64.6s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:29,604 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:29,604 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:29,604 backend.services.dgx INFO: 🏁 DGX PARALLEL complete: 3/3 succeeded in 64.7s total | NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:29,605 backend.routers.analyze INFO: 🏁 Parallel DGX: 64.67s | NON-COMPLIANT | 0 people | 3 batches → 12 total frames
+INFO:     127.0.0.1:64559 - "POST /analyze/frame/parallel HTTP/1.1" 200 OK
+2026-02-15 09:14:33,796 backend.services.dgx INFO: 📥 [09:14:33] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 65.7s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:33,797 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:14:33,797 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:33,798 backend.services.dgx INFO: 🏁 DGX PARALLEL complete: 3/3 succeeded in 65.8s total | NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:14:33,798 backend.routers.analyze INFO: 🏁 Parallel DGX: 65.76s | NON-COMPLIANT | 0 people | 3 batches → 12 total frames
+INFO:     127.0.0.1:64565 - "POST /analyze/frame/parallel HTTP/1.1" 200 OK
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27243]
+WARNING:  WatchFiles detected changes in 'backend/routers/analyze.py'. Reloading...
+2026-02-15 09:14:34,501 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:14:34,613 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [27400]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:14:34,965 backend.services.compliance_state INFO: 📂 Loaded compliance state: 1 people, 5 rule states from /Users/kuzeykantarcioglu/treehacks2026/backend/services/../../compliance_state.json
+2026-02-15 09:14:35,028 backend.main INFO: ✅ Async features enabled (Celery + WebSocket)
+INFO:     Started server process [27401]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+2026-02-15 09:14:35,042 backend.services.dgx INFO: 🟢 DGX health probe: connected to http://10.19.176.53:8001
+INFO:     127.0.0.1:64574 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:14:41,076 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:14:41,077 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:14:41,078 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:14:41,078 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:14:41,122 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 109100 chars base64  [decode=0.016s, encode=0.028s]
+2026-02-15 09:14:41,122 backend.services.dgx INFO: 🚀 [09:14:41] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 109122 chars base64
+2026-02-15 09:14:41,123 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:14:41,123 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:14:41,135 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 90608 chars base64  [decode=0.005s, encode=0.007s]
+2026-02-15 09:14:41,135 backend.services.dgx INFO: 🚀 [09:14:41] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 90630 chars base64
+2026-02-15 09:14:41,136 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:14:41,136 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:14:41,147 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 112544 chars base64  [decode=0.004s, encode=0.007s]
+2026-02-15 09:14:41,147 backend.services.dgx INFO: 🚀 [09:14:41] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 112566 chars base64
+2026-02-15 09:14:41,150 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:14:41,150 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:14:41,150 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:14:41,150 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:14:41,160 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 77624 chars base64  [decode=0.004s, encode=0.006s]
+2026-02-15 09:14:41,160 backend.services.dgx INFO: 🚀 [09:14:41] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 77646 chars base64
+2026-02-15 09:14:41,161 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:14:41,161 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:14:41,171 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 103540 chars base64  [decode=0.004s, encode=0.006s]
+2026-02-15 09:14:41,171 backend.services.dgx INFO: 🚀 [09:14:41] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 103562 chars base64
+2026-02-15 09:14:41,171 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:14:41,171 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:14:41,182 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 86500 chars base64  [decode=0.004s, encode=0.006s]
+2026-02-15 09:14:41,182 backend.services.dgx INFO: 🚀 [09:14:41] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 86522 chars base64
+INFO:     127.0.0.1:64643 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:15:24,021 backend.services.dgx INFO: 📥 [09:15:24] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 42.9s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:24,022 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:24,022 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:32,555 backend.services.dgx INFO: 📥 [09:15:32] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 51.4s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:32,555 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:32,556 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:35,045 backend.services.compliance_state INFO: 🔄 Compliance state reset
+INFO:     127.0.0.1:64670 - "POST /analyze/reset HTTP/1.1" 200 OK
+2026-02-15 09:15:36,054 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:15:36,054 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:15:36,437 backend.services.dgx INFO: 📥 [09:15:36] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 55.3s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:36,437 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:36,437 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:40,391 backend.services.dgx INFO: 📥 [09:15:40] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 59.2s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "no badge visible"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:40,392 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "no badge visible"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:40,392 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:41,269 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:15:41,273 backend.services.policy INFO: Combined analysis response received (732 chars)
+2026-02-15 09:15:41,273 backend.routers.analyze INFO: 📸 Frame analysis (openai): 5.22s | NON-COMPLIANT | 1 people | speech_rules=0, transcript=0 chars
+INFO:     127.0.0.1:64673 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:15:44,300 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:15:44,301 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+INFO:     127.0.0.1:64688 - "GET /health HTTP/1.1" 200 OK
+2026-02-15 09:15:50,395 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:15:50,397 backend.services.dgx INFO: 📥 [09:15:50] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 69.3s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:50,397 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:50,397 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:50,398 backend.services.dgx INFO: 📥 [09:15:50] DGX SPARK RESPONDED
+    Status: 200  |  ⏱️ Round-trip: 69.2s
+    Body: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:50,398 backend.services.dgx INFO: ⬅️  DGX PARSED JSON: {
+  "overall_status": "non_compliant",
+  "violations": [
+    {
+      "rule": "No Badge",
+      "subject": "Person 1",
+      "description": "facing camera, no badge"
+    }
+  ],
+  "compliant": []
+}
+2026-02-15 09:15:50,398 backend.services.dgx INFO: 🟢 DGX analysis: NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:50,399 backend.services.policy INFO: Combined analysis response received (697 chars)
+2026-02-15 09:15:50,399 backend.routers.analyze INFO: 📸 Frame analysis (openai): 6.10s | NON-COMPLIANT | 1 people | speech_rules=0, transcript=0 chars
+INFO:     127.0.0.1:64686 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:15:50,401 backend.services.dgx INFO: 🏁 DGX PARALLEL complete: 3/3 succeeded in 69.3s total | NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:50,401 backend.routers.analyze INFO: 🏁 Parallel DGX: 69.33s | NON-COMPLIANT | 0 people | 3 batches → 12 total frames
+INFO:     127.0.0.1:64610 - "POST /analyze/frame/parallel HTTP/1.1" 200 OK
+2026-02-15 09:15:50,402 backend.services.dgx INFO: 🏁 DGX PARALLEL complete: 3/3 succeeded in 69.3s total | NON-COMPLIANT | 0 people | 1 incidents
+2026-02-15 09:15:50,402 backend.routers.analyze INFO: 🏁 Parallel DGX: 69.25s | NON-COMPLIANT | 0 people | 3 batches → 12 total frames
+INFO:     127.0.0.1:64616 - "POST /analyze/frame/parallel HTTP/1.1" 200 OK
+2026-02-15 09:15:50,433 backend.routers.analyze INFO: 🚀 PARALLEL DGX REQUEST: 3 batches, max_concurrent=3
+2026-02-15 09:15:50,433 backend.services.dgx INFO: 🚀 DGX PARALLEL: 12 frames → 3 concurrent requests (chunk_size=4, max_concurrent=3)
+2026-02-15 09:15:50,433 backend.services.dgx INFO:   🔄 Chunk 0: 4 frames
+2026-02-15 09:15:50,434 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:15:50,456 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 102552 chars base64  [decode=0.009s, encode=0.013s]
+2026-02-15 09:15:50,456 backend.services.dgx INFO: 🚀 [09:15:50] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 102574 chars base64
+2026-02-15 09:15:50,457 backend.services.dgx INFO:   🔄 Chunk 1: 4 frames
+2026-02-15 09:15:50,457 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:15:50,475 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 139020 chars base64  [decode=0.006s, encode=0.011s]
+2026-02-15 09:15:50,475 backend.services.dgx INFO: 🚀 [09:15:50] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 139042 chars base64
+2026-02-15 09:15:50,475 backend.services.dgx INFO:   🔄 Chunk 2: 4 frames
+2026-02-15 09:15:50,475 backend.services.dgx INFO: 🟢 DGX: using 4 buffered frames
+2026-02-15 09:15:50,488 backend.services.dgx INFO: 🎞️  Created mp4 from 4 frames (640x480 @ 4fps) → 118716 chars base64  [decode=0.005s, encode=0.008s]
+2026-02-15 09:15:50,488 backend.services.dgx INFO: 🚀 [09:15:50] SENDING REQUEST TO DGX SPARK
+    URL: http://10.19.176.53:8001/v1/analyze_frame_sync
+    Frames: 4  |  Payload size: 118738 chars base64
+2026-02-15 09:15:53,425 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:15:53,426 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:15:59,121 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:15:59,140 backend.services.policy INFO: Combined analysis response received (689 chars)
+2026-02-15 09:15:59,140 backend.services.compliance_state INFO: ✅ Checklist compliance updated for unknown on rule: Person on foreground must be wearing a dark green, (valid until forever)
+2026-02-15 09:15:59,141 backend.routers.analyze INFO: 📸 Frame analysis (openai): 5.72s | NON-COMPLIANT | 1 people | speech_rules=0, transcript=0 chars
+INFO:     127.0.0.1:64707 - "POST /analyze/frame HTTP/1.1" 200 OK
+2026-02-15 09:16:02,168 backend.routers.analyze INFO: 📸 FRAME ANALYSIS REQUEST (provider=openai)
+2026-02-15 09:16:02,169 backend.services.policy INFO: Combined analysis: 1 frames, 2 rules
+2026-02-15 09:16:07,898 httpx INFO: HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-02-15 09:16:07,899 backend.services.policy INFO: Combined analysis response received (629 chars)
+2026-02-15 09:16:07,899 backend.routers.analyze INFO: 📸 Frame analysis (openai): 5.73s | NON-COMPLIANT | 1 people | speech_rules=0, transcript=0 chars
+INFO:     127.0.0.1:64709 - "POST /analyze/frame HTTP/1.1" 200 OK

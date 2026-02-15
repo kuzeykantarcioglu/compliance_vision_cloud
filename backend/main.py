@@ -33,7 +33,7 @@ except ImportError as e:
     ASYNC_ENABLED = False
 
 app = FastAPI(
-    title="Compliance Vision API",
+    title="Agent 00Vision API",
     description="AI-powered video compliance monitoring",
     version="0.1.0",
 )

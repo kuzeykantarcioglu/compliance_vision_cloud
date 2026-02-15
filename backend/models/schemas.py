@@ -100,6 +100,10 @@ class Policy(BaseModel):
         default="",
         description="Context from prior monitoring chunks about already-satisfied frequency rules (for live monitoring).",
     )
+    accumulated_transcript: str = Field(
+        default="",
+        description="Full transcript accumulated across all prior monitoring chunks (for speech checklist rules).",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +255,10 @@ class Report(BaseModel):
         default=None,
         description="Whisper transcript (if audio analysis was enabled)",
     )
+    checklist_fulfilled: Optional[bool] = Field(
+        default=None,
+        description="True if all checklist-mode verdicts are compliant, False if any are not, None if no checklist rules",
+    )
     analyzed_at: str = Field(..., description="ISO timestamp of analysis")
     total_frames_analyzed: int = 0
     video_duration: float = 0.0
@@ -282,6 +290,10 @@ class FrameAnalyzeRequest(BaseModel):
     frames: list[str] = Field(
         default=[],
         description='For DGX batch mode: array of base64-encoded JPEG frames captured over ~3 seconds at 4fps',
+    )
+    accumulated_transcript: str = Field(
+        default="",
+        description="Full transcript accumulated from background audio recording (for speech rules)",
     )
 
 

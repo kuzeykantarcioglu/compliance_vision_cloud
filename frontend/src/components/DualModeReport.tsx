@@ -121,6 +121,26 @@ export default function DualModeReport({ report }: DualModeReportProps) {
             </h3>
           </div>
 
+          {/* Checklist fulfilled banner */}
+          {report.checklist_fulfilled === true && checklistItems.length > 0 && (
+            <div className="p-3 rounded-lg border bg-green-50 border-green-200">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800">All checklist items fulfilled</span>
+              </div>
+            </div>
+          )}
+          {report.checklist_fulfilled === false && checklistItems.length > 0 && (
+            <div className="p-3 rounded-lg border bg-red-50 border-red-200">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <span className="text-sm font-medium text-red-800">
+                  Checklist not fulfilled — {checklistPending.length} of {checklistItems.length} item{checklistPending.length !== 1 ? "s" : ""} pending
+                </span>
+              </div>
+            </div>
+          )}
+
           {checklistItems.length === 0 ? (
             <div className="text-sm text-gray-500 py-4 text-center">
               No checklist items configured

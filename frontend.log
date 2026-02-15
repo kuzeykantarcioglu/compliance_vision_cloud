@@ -1,0 +1,44 @@
+
+> frontend@0.0.0 dev
+> vite
+
+
+  VITE v7.3.1  ready in 242 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+8:38:59 AM [vite] (client) hmr update /src/components/StatusIndicator.tsx, /src/index.css
+8:45:06 AM [vite] http proxy error: /analyze/frame
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+8:45:41 AM [vite] (client) hmr update /src/index.css
+8:45:45 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+8:45:50 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+8:45:56 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+8:46:02 AM [vite] (client) hmr update /src/components/PolicyConfig.tsx, /src/index.css
+8:46:05 AM [vite] (client) hmr update /src/components/PolicyConfig.tsx, /src/index.css
+8:46:13 AM [vite] (client) hmr update /src/components/PolicyConfig.tsx, /src/index.css
+8:46:21 AM [vite] (client) hmr update /src/index.css, /src/components/DualModeReport.tsx
+8:46:26 AM [vite] (client) hmr update /src/components/LiveReportView.tsx, /src/index.css
+8:46:45 AM [vite] (client) hmr update /src/components/LiveReportView.tsx, /src/index.css
+9:00:11 AM [vite] (client) hmr update /src/index.css
+9:00:26 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:01:27 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:01:36 AM [vite] (client) hmr update /src/components/StatusIndicator.tsx, /src/index.css
+9:02:41 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:02:51 AM [vite] (client) page reload index.html
+9:04:11 AM [vite] (client) hmr update /src/components/EmptyStateAnimation.tsx, /src/index.css
+9:06:09 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:06:22 AM [vite] (client) hmr update /src/components/EmptyStateAnimation.tsx, /src/index.css
+9:06:27 AM [vite] (client) hmr update /src/components/EmptyStateAnimation.tsx, /src/index.css
+9:11:08 AM [vite] (client) hmr update /src/App.tsx, /src/components/Header.tsx, /src/components/StatusIndicator.tsx, /src/components/PollyChat.tsx, /src/index.css
+9:11:17 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:11:29 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:11:45 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:12:44 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:13:01 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:13:21 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:14:01 AM [vite] (client) hmr update /src/App.tsx, /src/components/Header.tsx, /src/components/StatusIndicator.tsx, /src/components/PollyChat.tsx, /src/index.css
+9:14:07 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:14:12 AM [vite] (client) hmr update /src/App.tsx, /src/index.css
+9:14:18 AM [vite] (client) hmr update /src/App.tsx, /src/index.css

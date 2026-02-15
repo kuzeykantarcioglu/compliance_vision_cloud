@@ -206,12 +206,13 @@ def _apply_dual_mode_filtering(
         )
         
         all_verdicts.append(verdict)
-        
+
         # Only add to incidents if it's a real violation
         if not verdict.compliant:
-            # For incident mode, always report
-            # For checklist mode, only report if not filtered
-            if mode == "incident" or not anyone_still_compliant:
+            # Only incident-mode rules generate incidents.
+            # Checklist-mode rules are tracked separately via checklist_fulfilled
+            # and should never appear as incidents (even when pending/unfulfilled).
+            if mode == "incident":
                 incidents.append(verdict)
     
     return all_verdicts, incidents
@@ -395,6 +396,10 @@ Evaluate each policy rule against these observations""" + (
         observations
     )
 
+    # Compute checklist_fulfilled
+    checklist_verdicts = [v for v in all_verdicts if v.mode == "checklist"]
+    checklist_fulfilled = all(v.compliant for v in checklist_verdicts) if checklist_verdicts else None
+
     # Parse person summaries
     person_summaries = []
     for ps in data.get("person_summaries", []):
@@ -419,6 +424,7 @@ Evaluate each policy rule against these observations""" + (
         frame_observations=observations,
         person_summaries=person_summaries,
         transcript=transcript,
+        checklist_fulfilled=checklist_fulfilled,
         analyzed_at=datetime.now(timezone.utc).isoformat(),
         total_frames_analyzed=len(observations),
         video_duration=video_duration,
@@ -615,6 +621,10 @@ async def analyze_and_evaluate_combined(
         observations
     )
 
+    # Compute checklist_fulfilled
+    checklist_verdicts = [v for v in all_verdicts if v.mode == "checklist"]
+    checklist_fulfilled = all(v.compliant for v in checklist_verdicts) if checklist_verdicts else None
+
     # Parse person summaries
     person_summaries = []
     for ps in data.get("person_summaries", []):
@@ -651,6 +661,7 @@ async def analyze_and_evaluate_combined(
         recommendations=data.get("recommendations", []),
         frame_observations=observations,
         person_summaries=person_summaries,
+        checklist_fulfilled=checklist_fulfilled,
         analyzed_at=datetime.now(timezone.utc).isoformat(),
         total_frames_analyzed=len(keyframes),
         video_duration=video_duration,
