@@ -1,8 +1,9 @@
 <div align="center">
 
-# 🎥 Compliance Vision
+# 🕵️‍♂️ Agent 00Vision
 
 ### AI-Powered Video Compliance Monitoring Platform
+*"The name's Vision... Agent 00Vision"*
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)](https://fastapi.tiangolo.com/)

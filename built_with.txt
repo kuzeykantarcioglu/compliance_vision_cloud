@@ -1,0 +1,87 @@
+BUILT WITH:
+List of actual technologies, frameworks, APIs, and tools used in this project
+
+=== AI/ML APIS & MODELS ===
+- OpenAI GPT-4o Vision API (Cloud-based visual scene understanding and compliance detection)
+- OpenAI Whisper API (Audio transcription for verbal safety warnings)
+- NVIDIA DGX Spark (Local on-premise deployment):
+  - Cosmos Reason2 8B (Vision Language Model for person/object identification)
+  - Nemotron-3-Nano:30B (LLM for rule checking and compliance evaluation)
+- Claude AI (Development assistance via Claude Code)
+
+=== BACKEND (Python) ===
+- Python 3.11
+- FastAPI (Web framework for building APIs)
+- uvicorn[standard] (ASGI server)
+- python-dotenv (Environment variable management)
+- openai (OpenAI Python client library)
+- opencv-python-headless (Video frame extraction)
+- numpy (Array operations for image processing)
+- python-multipart (File upload handling)
+- celery[redis] (Distributed task queue for async video processing)
+- redis>=6.4.0 (Message broker for Celery)
+- websockets (Real-time communication)
+- setuptools (Build system)
+- pydantic (Data validation - comes with FastAPI)
+
+=== FRONTEND (React/TypeScript) ===
+- React 19.2.4 (UI framework)
+- TypeScript 5.9.3 (Type-safe JavaScript)
+- Vite 7.3.1 (Build tool and dev server)
+- Tailwind CSS 4.1.18 (Utility-first CSS framework)
+- @tailwindcss/vite (Tailwind Vite integration)
+- @vitejs/plugin-react (React plugin for Vite)
+- axios 1.13.5 (HTTP client for API calls)
+- lucide-react 0.564.0 (Icon library)
+
+=== CORE FEATURES IMPLEMENTED ===
+- Dual-mode compliance system (Incident vs Checklist modes)
+- Real-time video streaming via WebSocket
+- Async video processing with Celery task queue
+- Compliance state tracking with temporal memory
+- Frame extraction and intelligent sampling
+- Base64 image encoding for API transmission
+- Audio transcription with Whisper
+- Policy evaluation engine
+- Reference image matching
+- Retry logic with exponential backoff
+- Rate limiting for API calls
+
+=== BROWSER APIS ===
+- WebRTC/getUserMedia (Webcam access)
+- Canvas API (Frame capture from video)
+- FileReader API (File uploads)
+- WebSocket API (Real-time updates)
+
+=== PROTOCOLS & FORMATS ===
+- REST API (Primary API architecture)
+- WebSocket (Real-time bidirectional communication)
+- JSON (Data interchange format)
+- Base64 (Image encoding for transmission)
+- JPEG (Image format for frames)
+- MP4/WebM (Video formats)
+
+=== DEVELOPMENT TOOLS ===
+- Git (Version control)
+- VS Code (Primary IDE)
+- Claude Code (AI pair programming assistant)
+- Chrome DevTools (Frontend debugging)
+- npm (Node package manager)
+- pip (Python package manager)
+- venv (Python virtual environment)
+
+=== EXTERNAL INTEGRATIONS ===
+- Twilio API (Calling security for critical violations)
+
+=== HARDWARE ===
+- NVIDIA DGX Spark (Local AI inference platform)
+- Standard webcams (Video input sources)
+
+=== PLANNED/IN PROGRESS ===
+- TensorRT optimization for DGX models
+- Modal.com deployment for cloud scaling
+- Perplexity Sonar API for policy research
+- Additional notification channels (SMS via Twilio, Slack, Teams)
+
+TOTAL TECHNOLOGIES ACTIVELY USED: ~30
+PRIMARY INNOVATION: Dual-mode compliance system that prevents alert fatigue while maintaining safety standards
