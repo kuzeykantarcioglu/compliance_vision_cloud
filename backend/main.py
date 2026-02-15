@@ -1,15 +1,25 @@
 """FastAPI application entrypoint."""
 
 import logging
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Configure logging BEFORE any application imports.
+# logging.basicConfig() is a no-op if the root logger already has handlers
+# (e.g. when uvicorn configures logging before importing this module).
+# Force our handler onto the root logger so all app modules get proper output.
+_root = logging.getLogger()
+if not any(isinstance(h, logging.StreamHandler) and h.stream == sys.stderr for h in _root.handlers):
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s: %(message)s"))
+    _root.addHandler(_handler)
+_root.setLevel(logging.INFO)
+
 from backend.core.config import OPENAI_API_KEY
 from backend.routers.analyze import router as analyze_router
 from backend.routers.polly import router as polly_router
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s: %(message)s")
 
 app = FastAPI(
     title="Compliance Vision API",

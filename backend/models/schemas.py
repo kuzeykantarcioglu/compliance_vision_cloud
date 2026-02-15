@@ -209,6 +209,12 @@ class AnalyzeResponse(BaseModel):
     error: Optional[str] = None
 
 
+class FrameAnalyzeRequest(BaseModel):
+    """Single webcam frame for real-time monitoring (no video file needed)."""
+    image_base64: str = Field(..., description="Base64-encoded JPEG of a single webcam frame")
+    policy_json: str = Field(..., description="JSON-stringified Policy object")
+
+
 # ---------------------------------------------------------------------------
 # Video processing intermediate result
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ import PollyChat from "./components/PollyChat";
 import PipelineStatus from "./components/PipelineStatus";
 import ReportView from "./components/ReportView";
 import LiveReportView from "./components/LiveReportView";
-import { analyzeVideo, healthCheck } from "./api";
+import { analyzeVideo, analyzeFrame, healthCheck } from "./api";
 import type { Policy, Report, PipelineStage } from "./types";
 
 // Apply saved theme before first paint to avoid flash
@@ -149,52 +149,68 @@ export default function App() {
    * Tells the LLM which "at least once" rules are already satisfied per person.
    * Uses person_summaries (per-person compliance) for accurate attribution.
    */
+  /**
+   * Build prior_context string from accumulated reports.
+   *
+   * CRITICAL DISTINCTION by frequency:
+   * - "ALWAYS" rules must be checked in EVERY frame — never suppress them.
+   *   Instead, provide recent violation/compliance history so the LLM has context.
+   * - "AT_LEAST_ONCE" / "AT_LEAST_N" rules: once satisfied, stay satisfied.
+   *   These ARE suppressed in prior context to avoid false re-flagging.
+   */
   const buildPriorContext = useCallback((reports: Report[]): string => {
     if (reports.length === 0) return "";
     const lines: string[] = [];
+    const currentRules = policyRef.current.rules;
 
-    // Track which people were compliant in ANY chunk (person-level, from person_summaries)
-    const personCompliant = new Map<string, boolean>();  // person_id → ever compliant
-    const personViolations = new Map<string, Set<string>>();  // person_id → unsatisfied rule descriptions
-
-    for (const r of reports) {
-      for (const ps of r.person_summaries ?? []) {
-        if (ps.compliant) {
-          personCompliant.set(ps.person_id, true);
-        }
-        // Track violations that are NOT yet satisfied
-        if (!ps.compliant) {
-          if (!personViolations.has(ps.person_id)) {
-            personViolations.set(ps.person_id, new Set());
-          }
-          for (const v of ps.violations) {
-            personViolations.get(ps.person_id)?.add(v);
-          }
-        }
-      }
+    // Build a lookup: rule description → frequency
+    const ruleFrequency = new Map<string, string>();
+    for (const rule of currentRules) {
+      ruleFrequency.set(rule.description, rule.frequency || "always");
     }
 
-    // Collect rules that were satisfied (compliant verdict in ANY chunk) — per the whole session
-    const satisfiedRules = new Set<string>();
+    // --- AT_LEAST_ONCE / AT_LEAST_N rules: suppress once satisfied ---
+    const satisfiedOnceRules = new Set<string>();
     for (const r of reports) {
       for (const v of r.all_verdicts ?? []) {
         if (v.compliant) {
-          satisfiedRules.add(v.rule_description);
+          const freq = ruleFrequency.get(v.rule_description) ?? "always";
+          if (freq === "at_least_once" || freq === "at_least_n") {
+            satisfiedOnceRules.add(v.rule_description);
+          }
         }
       }
     }
 
-    // Build context: for each satisfied rule, list which people satisfied it
-    if (satisfiedRules.size > 0) {
-      lines.push("ALREADY SATISFIED RULES (do NOT flag these as violations again):");
-      for (const rule of satisfiedRules) {
-        const whoSatisfied: string[] = [];
-        for (const [pid, isCompliant] of personCompliant) {
-          if (isCompliant) whoSatisfied.push(pid);
-        }
-        lines.push(`  - "${rule}" → SATISFIED by ${whoSatisfied.length > 0 ? whoSatisfied.join(", ") : "at least one person"}`);
+    if (satisfiedOnceRules.size > 0) {
+      lines.push("ALREADY SATISFIED (frequency-based rules — do NOT re-flag):");
+      for (const rule of satisfiedOnceRules) {
+        lines.push(`  - "${rule}" → SATISFIED (at-least-once fulfilled)`);
       }
-      lines.push("Mark these rules as COMPLIANT. Do NOT generate incidents for them.");
+    }
+
+    // --- ALWAYS rules: provide recent history for context, but NEVER suppress ---
+    const alwaysRuleDescs = currentRules
+      .filter(r => (r.frequency || "always") === "always")
+      .map(r => r.description);
+
+    if (alwaysRuleDescs.length > 0 && reports.length > 0) {
+      // Show last verdict for each ALWAYS rule so the LLM knows recent state
+      const lastReport = reports[reports.length - 1];
+      const recentVerdicts: string[] = [];
+      for (const desc of alwaysRuleDescs) {
+        const lastVerdict = lastReport.all_verdicts?.find(v => v.rule_description === desc);
+        if (lastVerdict) {
+          recentVerdicts.push(
+            `  - "${desc}" was ${lastVerdict.compliant ? "COMPLIANT" : "NON-COMPLIANT"} in the previous frame`
+          );
+        }
+      }
+      if (recentVerdicts.length > 0) {
+        lines.push("ALWAYS-RULES RECENT STATUS (re-evaluate each frame independently):");
+        lines.push(...recentVerdicts);
+        lines.push("These rules must hold in EVERY frame. Judge this frame on its own merits.");
+      }
     }
 
     return lines.join("\n");
@@ -227,49 +243,115 @@ export default function App() {
   }, [buildPriorContext]);
 
   /**
-   * Pipelined loop: overlaps recording and analysis.
+   * Capture a single JPEG frame from the live webcam video element.
+   * Uses an offscreen canvas — takes <1ms. Returns base64 string or null.
+   */
+  const captureFrame = useCallback((): string | null => {
+    // Find the webcam video element — try autoplay attr first, then any video with a srcObject
+    let videoEl = document.querySelector("video[autoplay]") as HTMLVideoElement | null;
+    if (!videoEl || !videoEl.srcObject) {
+      // Fallback: find any video element that has a live stream (srcObject set)
+      const allVideos = document.querySelectorAll("video");
+      for (const v of allVideos) {
+        if (v.srcObject && (v as HTMLVideoElement).videoWidth > 0) {
+          videoEl = v as HTMLVideoElement;
+          break;
+        }
+      }
+    }
+    if (!videoEl || !videoEl.srcObject || videoEl.videoWidth === 0) return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = videoEl.videoWidth;
+    canvas.height = videoEl.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(videoEl, 0, 0);
+    // quality 0.6 keeps base64 small (~30-50KB) for fast upload
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+    // Strip the "data:image/jpeg;base64," prefix — backend handles both but smaller payload
+    return dataUrl.split(",")[1] || null;
+  }, []);
+
+  /** Analyze a single captured frame. Same prior_context logic as analyzeChunk.
+   *  Returns true on success, false on error (used by monitoring loop for backoff). */
+  const analyzeFrameChunk = useCallback(async (imageBase64: string, mySession: number): Promise<boolean> => {
+    setLiveStage("analyzing");
+
+    // Inject prior_context from accumulated reports
+    const currentPolicy = { ...policyRef.current };
+    const priorCtx = buildPriorContext(liveReportsRef.current);
+    if (priorCtx) {
+      currentPolicy.prior_context = priorCtx;
+    }
+
+    const result = await analyzeFrame(imageBase64, currentPolicy);
+    if (!monitoringRef.current || sessionIdRef.current !== mySession) return false;
+
+    if (result.status === "complete" && result.report) {
+      setLiveReports((prev) => [...prev, result.report!]);
+      setChunksProcessed((prev) => prev + 1);
+      setLiveStage("complete");
+      setLiveError(null);
+      return true;
+    } else {
+      setLiveError(result.error || "Frame analysis failed.");
+      setLiveStage("error");
+      return false;
+    }
+  }, [buildPriorContext]);
+
+  /**
+   * Frame-capture monitoring loop (replaces video chunk pipeline).
    *
-   * First chunk is shorter (3s) for a fast initial result.
-   * Health check runs in parallel with first chunk recording.
+   * Tight loop: capture instant JPEG → send to /analyze/frame → repeat.
+   * No video recording, no ffmpeg, no OpenCV. ~2-4s per cycle.
+   *
+   * Includes exponential backoff on errors (e.g. rate limits) to avoid
+   * hammering the API. Resets backoff after a successful call.
    *
    * Timeline:
-   *   record(3s) ──→ fire analyze ──→ record(8s) ──→ wait prev ──→ fire analyze ──→ ...
-   *   healthCheck() ──┘ (parallel)     └── runs in background ──┘
+   *   captureFrame() → await analyzeFrameChunk() → captureFrame() → ...
+   *   (capture is instant — <1ms — so no pipelining needed)
    */
   const runMonitoringLoop = useCallback(async () => {
     const mySession = sessionIdRef.current;
-    let isFirst = true;
-    let pendingAnalysis: Promise<void> | null = null;
+    let consecutiveErrors = 0;
+    const BASE_DELAY_MS = 2_000;    // 2s minimum wait between calls (keeps us under RPM limits)
+    const MAX_BACKOFF_MS = 30_000;  // 30s max backoff on repeated errors
 
-    // Warm-start health check runs in parallel with first chunk recording (not awaited upfront)
-    const warmup = healthCheck().catch(() => {});
+    // Warm-start health check in background
+    healthCheck().catch(() => {});
 
     while (monitoringRef.current && sessionIdRef.current === mySession) {
-      // 1. Record chunk — first chunk is short for fast initial result
-      const duration = isFirst ? FIRST_CHUNK_DURATION_MS : CHUNK_DURATION_MS;
-      const file = await recordChunk(mySession, duration);
-      if (!file || !monitoringRef.current || sessionIdRef.current !== mySession) break;
-
-      // Wait for warmup only on first chunk (should be done by now — ran in parallel)
-      if (isFirst) {
-        await warmup;
-        isFirst = false;
-      }
-
-      // 2. If previous analysis is still running, wait for it (max 1 in-flight)
-      if (pendingAnalysis) {
-        await pendingAnalysis;
-        pendingAnalysis = null;
+      // 1. Capture a single JPEG frame from the webcam (instant)
+      const frameBase64 = captureFrame();
+      if (!frameBase64) {
+        // Webcam not ready yet — wait a moment and retry
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
       }
       if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
 
-      // 3. Fire analysis for this chunk — DON'T await, immediately loop to record next chunk
-      pendingAnalysis = analyzeChunk(file, mySession);
-    }
+      // 2. Send frame to backend and wait for result (~2-3s)
+      const success = await analyzeFrameChunk(frameBase64, mySession);
 
-    // Drain: wait for last in-flight analysis to finish
-    if (pendingAnalysis) await pendingAnalysis;
-  }, [recordChunk, analyzeChunk]);
+      if (!monitoringRef.current || sessionIdRef.current !== mySession) break;
+
+      // 3. Backoff on errors to avoid rate-limit storms; pace on success to stay under RPM
+      if (!success) {
+        consecutiveErrors++;
+        const backoff = Math.min(BASE_DELAY_MS * Math.pow(2, consecutiveErrors - 1), MAX_BACKOFF_MS);
+        console.warn(`[Monitor] Error #${consecutiveErrors}, backing off ${(backoff / 1000).toFixed(1)}s`);
+        await new Promise((r) => setTimeout(r, backoff));
+      } else {
+        consecutiveErrors = 0;
+        // Pace requests to stay under RPM limits (wait at least BASE_DELAY between calls)
+        await new Promise((r) => setTimeout(r, BASE_DELAY_MS));
+      }
+    }
+  }, [captureFrame, analyzeFrameChunk]);
 
   const canStartMonitoring =
     (policy.rules.length > 0 || policy.custom_prompt.trim().length > 0) &&

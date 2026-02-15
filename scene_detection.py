@@ -21,12 +21,15 @@ import cv2
 import json
 import time
 import hashlib
+import logging
 import threading
 import numpy as np
 from queue import Queue, Empty
 from datetime import datetime
 from typing import Optional, Callable
 import argparse
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -349,12 +352,11 @@ def detect_significant_changes(
     duration = total_frames / fps if fps > 0 else 0
     sample_step = max(1, int(fps * sample_interval))
 
-    print(f"Analyzing video: {video_path}")
-    print(f"  Duration: {duration:.1f}s | FPS: {fps:.1f} | Frames: {total_frames}")
-    print(f"  Sampling every {sample_interval}s ({sample_step} frames) | Threshold: {change_threshold}")
-    print(f"  Min interval: {min_change_interval}s | Max gap: {max_gap}s")
-    print(f"  Mode: threaded pipeline (reader thread + detector + async writer)")
-    print()
+    logger.info(f"Analyzing video: {video_path}")
+    logger.info(f"  Duration: {duration:.1f}s | FPS: {fps:.1f} | Frames: {total_frames}")
+    logger.info(f"  Sampling every {sample_interval}s ({sample_step} frames) | Threshold: {change_threshold}")
+    logger.info(f"  Min interval: {min_change_interval}s | Max gap: {max_gap}s")
+    logger.info(f"  Mode: threaded pipeline (reader thread + detector + async writer)")
 
     detector = ChangeDetector(
         change_threshold=change_threshold,
@@ -389,7 +391,7 @@ def detect_significant_changes(
         event = detector.process_frame(frame, timestamp, frame_idx)
         if event:
             tag = event["trigger"].upper().ljust(7)
-            print(f"  [{tag}]  t={timestamp:7.2f}s  score={event['change_score']:.4f}  frame={frame_idx}")
+            logger.info(f"  [{tag}]  t={timestamp:7.2f}s  score={event['change_score']:.4f}  frame={frame_idx}")
 
         frames_processed += 1
 
@@ -406,7 +408,7 @@ def detect_significant_changes(
                 if event:
                     # Force it as "last" trigger
                     event["trigger"] = "last"
-                    print(f"  [LAST   ]  t={ts:7.2f}s  frame={last_frame_idx}")
+                    logger.info(f"  [LAST   ]  t={ts:7.2f}s  frame={last_frame_idx}")
 
     cap.release()
     stop_event.set()
@@ -416,9 +418,9 @@ def detect_significant_changes(
     elapsed = time.perf_counter() - t_start
     events = detector.events
 
-    print(f"\n  Total change events: {len(events)}")
-    print(f"  Frames sampled: {frames_processed}")
-    print(f"  Processing time: {elapsed:.2f}s ({frames_processed / max(elapsed, 0.001):.0f} sampled frames/sec)")
+    logger.info(f"Total change events: {len(events)}")
+    logger.info(f"Frames sampled: {frames_processed}")
+    logger.info(f"Processing time: {elapsed:.2f}s ({frames_processed / max(elapsed, 0.001):.0f} sampled frames/sec)")
 
     return events
 
@@ -495,7 +497,7 @@ class StreamingDetector:
         self._detector_thread = threading.Thread(target=self._detector_loop, daemon=True)
         self._grabber_thread.start()
         self._detector_thread.start()
-        print(f"Streaming detector started (source={self.source}, interval={self.sample_interval}s)")
+        logger.info(f"Streaming detector started (source={self.source}, interval={self.sample_interval}s)")
 
     def stop(self):
         """Stop capture + detection. Blocks until threads finish."""
@@ -505,7 +507,7 @@ class StreamingDetector:
         if self._detector_thread:
             self._detector_thread.join(timeout=3.0)
         self._detector.finalize()
-        print(f"Streaming detector stopped. {len(self.events)} events captured.")
+        logger.info(f"Streaming detector stopped. {len(self.events)} events captured.")
 
     def _grabber_loop(self):
         """Continuously grab frames, store only the latest (ring buffer of 1).
@@ -516,7 +518,7 @@ class StreamingDetector:
         """
         cap = cv2.VideoCapture(self.source)
         if not cap.isOpened():
-            print(f"Error: Could not open video source: {self.source}")
+            logger.error(f"Could not open video source: {self.source}")
             return
 
         while not self._stop_event.is_set():
@@ -548,7 +550,7 @@ class StreamingDetector:
 
             if event:
                 tag = event["trigger"].upper().ljust(7)
-                print(f"  [LIVE {tag}]  t={timestamp:7.2f}s  score={event['change_score']:.4f}")
+                logger.info(f"  [LIVE {tag}]  t={timestamp:7.2f}s  score={event['change_score']:.4f}")
 
 
 # ---------------------------------------------------------------------------

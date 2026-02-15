@@ -70,28 +70,11 @@ function findNearestFrame(timestamp: number | null, observations: FrameObservati
 export default function LiveReportView({ reports, isMonitoring, sessionStart }: Props) {
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  // Build set of rules that were satisfied (compliant) in any chunk
-  const satisfiedRules = new Set<string>();
-  for (const r of reports) {
-    for (const v of r.all_verdicts ?? []) {
-      if (v.compliant) satisfiedRules.add(v.rule_description);
-    }
-  }
 
-  // Aggregate incidents — filter out incidents for rules already satisfied in an earlier chunk
+
+  // Aggregate incidents — show all incidents reported by the backend
   const allIncidents = reports.flatMap((r, ri) =>
-    r.incidents
-      .filter((v) => {
-        // If this rule was satisfied in a PRIOR chunk, skip this incident
-        for (let pi = 0; pi < ri; pi++) {
-          const priorChunk = reports[pi];
-          if (priorChunk.all_verdicts?.some((pv) => pv.compliant && pv.rule_description === v.rule_description)) {
-            return false; // Already satisfied before this chunk
-          }
-        }
-        return true;
-      })
-      .map((v) => ({ ...v, chunkIndex: ri }))
+    r.incidents.map((v) => ({ ...v, chunkIndex: ri }))
   );
   const allObservations = reports.flatMap((r) => r.frame_observations);
   const totalFrames = reports.reduce((sum, r) => sum + r.total_frames_analyzed, 0);
@@ -433,15 +416,11 @@ export default function LiveReportView({ reports, isMonitoring, sessionStart }: 
           </h3>
           {reports.map((r, i) => {
             // Check if this chunk's incidents are all resolved by later compliant chunks
-            const effectiveIncidents = r.incidents.filter((v) => {
-              for (let pi = 0; pi < i; pi++) {
-                if (reports[pi].all_verdicts?.some((pv) => pv.compliant && pv.rule_description === v.rule_description)) {
-                  return false;
-                }
-              }
-              return true;
-            });
-            const effectiveCompliant = effectiveIncidents.length === 0;
+            // Trust the backend's verdict. If it flagged incidents, show them regardless of history.
+            // (Previous logic filtered out incidents if the rule was satisfied in an older chunk, 
+            // but that forces "at least once" logic on everything. We should respect the LLM's decision.)
+            const effectiveIncidents = r.incidents;
+            const effectiveCompliant = r.overall_compliant;
 
             return (
               <div

@@ -12,15 +12,12 @@ import logging
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from openai import AsyncOpenAI
 
-from backend.core.config import OPENAI_API_KEY
+from backend.core.config import openai_client as client
 from backend.models.schemas import Policy
 
 router = APIRouter(prefix="/polly", tags=["polly"])
 logger = logging.getLogger(__name__)
-
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 SYSTEM_PROMPT = """You are Polly, a friendly and expert compliance policy creation assistant.
 

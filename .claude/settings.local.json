@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(wmic:*)",
+      "Bash(powershell:*)",
+      "Bash(npx vite build:*)",
+      "Bash(\"C:\\\\Users\\\\mdoru\\\\anaconda3\\\\python.exe\" -c \"\nimport base64, json, requests\n\n# Create a minimal valid JPEG using PIL\nfrom PIL import Image\nimport io\n\nimg = Image.new\\(''RGB'', \\(100, 100\\), color=''red''\\)\nbuf = io.BytesIO\\(\\)\nimg.save\\(buf, format=''JPEG''\\)\nb64 = base64.b64encode\\(buf.getvalue\\(\\)\\).decode\\(\\)\n\npolicy = {\n    ''rules'': [{''type'': ''badge'', ''description'': ''Detect people who has TreeHacks badge'', ''severity'': ''high'', ''frequency'': ''always'', ''frequency_count'': 1}],\n    ''custom_prompt'': '''',\n    ''include_audio'': False,\n    ''reference_images'': [],\n    ''enabled_reference_ids'': [],\n    ''prior_context'': ''''\n}\n\nresp = requests.post\\(''http://127.0.0.1:8000/analyze/frame'', json={\n    ''image_base64'': b64,\n    ''policy_json'': json.dumps\\(policy\\)\n}, timeout=30\\)\n\nprint\\(f''Status: {resp.status_code}''\\)\ndata = resp.json\\(\\)\nprint\\(f''Response status: {data[\"\"status\"\"]}''\\)\nif data.get\\(''report''\\):\n    print\\(f''Report summary: {data[\"\"report\"\"][\"\"summary\"\"]}''\\)\n    print\\(f''Overall compliant: {data[\"\"report\"\"][\"\"overall_compliant\"\"]}''\\)\n    print\\(f''Verdicts: {len\\(data[\"\"report\"\"][\"\"all_verdicts\"\"]\\)}''\\)\n    print\\(f''Person summaries: {len\\(data[\"\"report\"\"][\"\"person_summaries\"\"]\\)}''\\)\nelse:\n    print\\(f''Error: {data.get\\(\"\"error\"\"\\)}''\\)\n\")",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

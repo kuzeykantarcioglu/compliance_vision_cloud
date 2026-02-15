@@ -12,9 +12,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from openai import AsyncOpenAI
-
-from backend.core.config import OPENAI_API_KEY
+from backend.core.config import openai_client as client
 from backend.models.schemas import (
     FrameObservation,
     KeyframeData,
@@ -26,7 +24,6 @@ from backend.models.schemas import (
 )
 
 logger = logging.getLogger(__name__)
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 SYSTEM_PROMPT = """You are an expert compliance evaluator for a video surveillance monitoring system.
 
@@ -50,12 +47,13 @@ FREQUENCY SEMANTICS:
 - "AT LEAST N TIMES": Satisfied if observed in N or more distinct frames.
 
 CRITICAL — PRIOR CONTEXT:
-If prior context states that a rule was ALREADY SATISFIED by a person in an earlier chunk, that person is COMPLIANT for that rule. Do NOT re-flag it as a violation. Mark it compliant with a note like "Previously satisfied."
+- For "AT LEAST ONCE" / "AT LEAST N" rules: If prior context says ALREADY SATISFIED, mark COMPLIANT. Do NOT re-flag.
+- For "ALWAYS" rules: Prior context is informational only. You MUST re-evaluate ALWAYS rules from scratch in every frame. A person who was compliant before may not be compliant now.
 
 PER-PERSON EVALUATION:
 - Evaluate each person individually against person-relevant rules.
 - Produce a person_summaries array with one entry per tracked person.
-- If a person was already marked compliant in prior context, keep them compliant.
+- For frequency-based rules only: if a person was already marked compliant in prior context, keep them compliant.
 
 WRITING STYLE:
 - Be concise and direct. No filler words.
@@ -255,10 +253,12 @@ Evaluate each policy rule against these observations""" + (
     )
 
     raw = response.choices[0].message.content or "{}"
+    logger.info(f"Policy evaluation response received ({len(raw)} chars)")
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
+        logger.error(f"Failed to parse policy evaluation JSON: {raw[:300]}")
         # Fallback: return error report
         return Report(
             video_id=video_id,
@@ -324,20 +324,60 @@ Evaluate each policy rule against these observations""" + (
 # Combined single-call analysis (VLM + Policy in one shot) — for webcam chunks
 # ---------------------------------------------------------------------------
 
-COMBINED_PROMPT = """You are a compliance monitoring AI. You will see surveillance camera frames and a compliance policy.
+COMBINED_PROMPT = """You are a compliance monitoring AI. Analyze frames against the policy.
 
-YOUR JOB: Look at the images, identify what each person is doing, and evaluate each policy rule.
+FREQUENCY RULES:
+- "ALWAYS" = must hold in EVERY frame. Always re-evaluate from scratch. Prior context for ALWAYS rules is informational only — judge this frame independently.
+- "AT LEAST ONCE" = satisfied if seen in any frame. If prior context says already satisfied, mark COMPLIANT.
 
-RULES:
-- "ALWAYS": Must hold in EVERY frame.
-- "AT LEAST ONCE": Satisfied if observed in ANY single frame. Once satisfied, compliant forever.
+Use reference labels for known people, "Person_A" etc for unknown.
+Be VERY brief. 1 short sentence per field max."""
 
-If PRIOR CONTEXT says a rule was already satisfied, mark it COMPLIANT immediately.
-
-If REFERENCE IMAGES of people are provided, identify people by their reference label.
-For unknown people, use "Person_A", "Person_B", etc.
-
-Be CONCISE. Summary: 1 sentence. Reasons: 1 sentence max."""
+# Leaner schema for webcam chunks — fewer output tokens = faster response
+COMBINED_REPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {
+            "type": "string",
+            "description": "1 sentence: # violations and status.",
+        },
+        "overall_compliant": {"type": "boolean"},
+        "verdicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "rule_description": {"type": "string"},
+                    "compliant": {"type": "boolean"},
+                    "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                    "reason": {"type": "string", "description": "1 sentence max."},
+                    "timestamp": {"type": ["number", "null"]},
+                },
+                "required": ["rule_description", "compliant", "severity", "reason", "timestamp"],
+                "additionalProperties": False,
+            },
+        },
+        "person_summaries": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "person_id": {"type": "string"},
+                    "appearance": {"type": "string"},
+                    "first_seen": {"type": "number"},
+                    "last_seen": {"type": "number"},
+                    "frames_seen": {"type": "integer"},
+                    "compliant": {"type": "boolean"},
+                    "violations": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["person_id", "appearance", "first_seen", "last_seen", "frames_seen", "compliant", "violations"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["summary", "overall_compliant", "verdicts", "person_summaries"],
+    "additionalProperties": False,
+}
 
 
 async def analyze_and_evaluate_combined(
@@ -379,11 +419,12 @@ async def analyze_and_evaluate_combined(
         content.append({"type": "text", "text": "[SURVEILLANCE FRAMES BELOW]"})
 
     # Add keyframe images with timestamps
+    # detail:"low" = fixed 85 tokens/image (vs ~1100 for "auto") — much faster
     for kf in keyframes:
         content.append({"type": "text", "text": f"[Frame at t={kf.timestamp:.1f}s]"})
         content.append({
             "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{kf.image_base64}", "detail": "auto"},
+            "image_url": {"url": f"data:image/jpeg;base64,{kf.image_base64}", "detail": "low"},
         })
 
     logger.info(f"Combined analysis: {len(keyframes)} frames, {len(policy.rules)} rules")
@@ -399,17 +440,19 @@ async def analyze_and_evaluate_combined(
             "json_schema": {
                 "name": "compliance_report",
                 "strict": True,
-                "schema": REPORT_SCHEMA,
+                "schema": COMBINED_REPORT_SCHEMA,
             },
         },
-        temperature=0.1,
-        max_tokens=1200,
+        temperature=0.0,
+        max_tokens=600,
     )
 
     raw = response.choices[0].message.content or "{}"
+    logger.info(f"Combined analysis response received ({len(raw)} chars)")
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
+        logger.error(f"Failed to parse combined analysis JSON: {raw[:300]}")
         return Report(
             video_id=video_id,
             summary="Failed to parse report.",

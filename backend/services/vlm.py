@@ -9,12 +9,12 @@ The policy context is included in the prompt so the VLM knows what to focus on.
 
 import asyncio
 import json
-from openai import AsyncOpenAI
+import logging
 
-from backend.core.config import OPENAI_API_KEY
+from backend.core.config import openai_client as client
 from backend.models.schemas import KeyframeData, FrameObservation, PersonDetail, Policy, ReferenceImage
 
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+logger = logging.getLogger(__name__)
 
 
 def _effective_reference_images(policy: Policy) -> list[ReferenceImage]:
@@ -269,6 +269,8 @@ async def analyze_frames(
         for i in range(0, len(keyframes), effective_batch)
     ]
 
+    logger.info(f"VLM analysis: {len(keyframes)} keyframes in {len(batches)} batch(es) (batch_size={effective_batch}, refs={len(effective.reference_images)})")
+
     # Run batches concurrently
     tasks = [_analyze_batch(batch, policy_context, effective) for batch in batches]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -277,6 +279,7 @@ async def analyze_frames(
     all_observations = []
     for i, result in enumerate(results):
         if isinstance(result, Exception):
+            logger.error(f"VLM batch {i+1}/{len(batches)} FAILED: {result}", exc_info=result)
             # If a batch failed, create placeholder observations
             for kf in batches[i]:
                 all_observations.append(FrameObservation(
@@ -289,4 +292,5 @@ async def analyze_frames(
         else:
             all_observations.extend(result)
 
+    logger.info(f"VLM analysis complete: {len(all_observations)} observations")
     return all_observations
