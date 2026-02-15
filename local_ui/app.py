@@ -78,6 +78,11 @@ RULES:
     "clip_duration": 3,
     "fps": 4,
     "auto_analyze": True,
+    "alert_email": "userdorukhan@gmail.com",
+    "email_alerts_enabled": True,
+    "resend_api_key": "",
+    "email_from": "Compliance Vision <onboarding@resend.dev>",
+    "location": "Stanford University - TreeHacks 2026",
 }
 
 # Runtime state
@@ -99,6 +104,11 @@ class ConfigUpdate(BaseModel):
     clip_duration: Optional[int] = None
     fps: Optional[int] = None
     auto_analyze: Optional[bool] = None
+    alert_email: Optional[str] = None
+    email_alerts_enabled: Optional[bool] = None
+    resend_api_key: Optional[str] = None
+    email_from: Optional[str] = None
+    location: Optional[str] = None
 
 
 class AnalyzeRequest(BaseModel):
@@ -114,6 +124,118 @@ def get_proxy_url():
     return f"http://{config['spark_ip']}:{config['proxy_port']}{config['endpoint_path']}"
 
 
+def send_alert_email(report: dict):
+    """Send an email alert via Resend API when violations are detected."""
+    if not config.get("email_alerts_enabled"):
+        return
+    recipient = config.get("alert_email", "").strip()
+    api_key = config.get("resend_api_key", "").strip()
+    email_from = config.get("email_from", "Compliance Vision <onboarding@resend.dev>").strip()
+    if not recipient:
+        logger.warning("Email alerts enabled but no recipient configured")
+        return
+    if not api_key:
+        logger.warning("Email alerts enabled but no Resend API key configured")
+        return
+
+    location = config.get("location", "Unknown Location")
+    violations = report.get("violations", [])
+    people = report.get("people", [])
+    timestamp = report.get("timestamp", time.strftime("%Y-%m-%d %H:%M:%S"))
+    status = report.get("status", "UNKNOWN")
+    v_count = report.get("violation_count", len(violations))
+
+    subject = f"\U0001f6a8 Security Alert \u2014 {v_count} Violation(s) at {location}"
+
+    # Build HTML email body
+    violation_rows = ""
+    for v in violations:
+        violation_rows += f"""
+        <tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;color:#dc2626;">{v.get('subject', 'Unknown')}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;">{v.get('rule', 'Violation')}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#666;">{v.get('description', '')}</td>
+        </tr>"""
+
+    people_rows = ""
+    for p in people:
+        badge_color = "#16a34a" if p.get("compliant") else "#dc2626"
+        badge_text = "Compliant" if p.get("compliant") else "Violation"
+        if p.get("facing_camera") is False:
+            badge_color = "#ca8a04"
+            badge_text = "Not Facing"
+        people_rows += f"""
+        <tr>
+            <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;">{p.get('person', 'Person')}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;color:{badge_color};font-weight:600;">{badge_text}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid #f0f0f0;color:#666;font-size:13px;">{p.get('description', '')}</td>
+        </tr>"""
+
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:#dc2626;color:white;padding:16px 20px;border-radius:8px 8px 0 0;">
+            <h2 style="margin:0;font-size:18px;">\U0001f6a8 Compliance Violation Detected</h2>
+        </div>
+        <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:20px;border-radius:0 0 8px 8px;">
+            <table style="width:100%;margin-bottom:16px;">
+                <tr><td style="color:#666;padding:4px 0;">Location:</td><td style="font-weight:600;">{location}</td></tr>
+                <tr><td style="color:#666;padding:4px 0;">Time:</td><td>{timestamp}</td></tr>
+                <tr><td style="color:#666;padding:4px 0;">Status:</td><td style="color:#dc2626;font-weight:700;">{status}</td></tr>
+                <tr><td style="color:#666;padding:4px 0;">Violations:</td><td style="font-weight:600;">{v_count}</td></tr>
+            </table>
+
+            <h3 style="font-size:14px;color:#333;border-bottom:2px solid #dc2626;padding-bottom:6px;">Violations</h3>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+                <tr style="background:#fef2f2;">
+                    <th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;">Subject</th>
+                    <th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;">Rule</th>
+                    <th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;">Description</th>
+                </tr>
+                {violation_rows}
+            </table>
+
+            {f'''
+            <h3 style="font-size:14px;color:#333;border-bottom:2px solid #6366f1;padding-bottom:6px;">All Detected People</h3>
+            <table style="width:100%;border-collapse:collapse;">
+                <tr style="background:#f8fafc;">
+                    <th style="padding:6px 12px;text-align:left;font-size:12px;color:#666;">Person</th>
+                    <th style="padding:6px 12px;text-align:left;font-size:12px;color:#666;">Status</th>
+                    <th style="padding:6px 12px;text-align:left;font-size:12px;color:#666;">Description</th>
+                </tr>
+                {people_rows}
+            </table>
+            ''' if people_rows else ''}
+
+            <p style="margin-top:20px;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:12px;">
+                Sent by Compliance Vision &mdash; TreeHacks 2026
+            </p>
+        </div>
+    </div>
+    """
+
+    try:
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": email_from,
+                "to": [recipient],
+                "subject": subject,
+                "html": html_body,
+            },
+            timeout=10,
+        )
+        if resp.status_code in (200, 201):
+            logger.info(f"Alert email sent to {recipient} via Resend")
+        else:
+            logger.error(f"Resend API error {resp.status_code}: {resp.text}")
+    except Exception as e:
+        logger.error(f"Failed to send alert email: {e}")
+
+
 def check_connection():
     """Check if DGX proxy is reachable"""
     try:
@@ -127,13 +249,23 @@ def check_connection():
 
 
 def convert_webm_to_mp4(video_bytes: bytes) -> bytes:
-    """Convert webm/any video bytes to mp4 using OpenCV"""
-    # Write input to temp file
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
+    """Convert any video bytes to mp4 using OpenCV.
+    Detects format from file signature to use correct temp extension."""
+    # Detect format from magic bytes
+    if video_bytes[:4] == b'\x1aE\xdf\xa3':
+        ext = ".webm"
+    elif video_bytes[4:8] == b'ftyp':
+        ext = ".mp4"  # Already mp4, still re-encode for consistency
+    elif video_bytes[:4] == b'RIFF':
+        ext = ".avi"
+    else:
+        ext = ".mp4"  # Default
+
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_in:
         tmp_in.write(video_bytes)
         tmp_in_path = tmp_in.name
 
-    tmp_out_path = tmp_in_path.replace(".webm", ".mp4")
+    tmp_out_path = tmp_in_path.rsplit(".", 1)[0] + "_out.mp4"
 
     try:
         cap = cv2.VideoCapture(tmp_in_path)
@@ -215,7 +347,8 @@ def analyze_video(video_b64: str, prompt: str, max_tokens: int, temperature: flo
     logger.info(f"DGX response status: {response.status_code}")
 
     data = response.json()
-    logger.info(f"DGX response: {json.dumps(data)[:500]}")
+    logger.info(f"DGX response keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+    logger.info(f"DGX response: {json.dumps(data)[:1000]}")
 
     if "error" in data:
         raise RuntimeError(data["error"])
@@ -223,14 +356,84 @@ def analyze_video(video_b64: str, prompt: str, max_tokens: int, temperature: flo
 
 
 def format_report(report):
-    """Format compliance report for display"""
-    status = report.get("overall_status", "unknown").upper()
-    violations = report.get("violations", [])
+    """Format compliance report for display.
+    Handles both direct Nemotron output and OpenAI-wrapped format.
+    Also extracts Cosmos people data when available."""
+    import re as _re
+    compliance = None
+    people = []
+    people_count = 0
+    raw_content = ""
+
+    # Case 1: Direct Nemotron format {overall_status, violations}
+    if "overall_status" in report:
+        compliance = report
+    # Case 2: OpenAI chat-completion wrapper {choices: [{message: {content: "..."}}]}
+    elif "choices" in report:
+        try:
+            raw_content = report["choices"][0]["message"]["content"]
+            # Extract JSON from possible thinking text
+            match = _re.search(r'\{[\s\S]*\}', raw_content)
+            if match:
+                compliance = json.loads(match.group())
+        except Exception as e:
+            logger.warning(f"Could not parse choices content: {e}")
+
+    if compliance and "overall_status" in compliance:
+        status = compliance["overall_status"].upper()
+        violations = compliance.get("violations", [])
+    else:
+        status = "UNKNOWN"
+        violations = []
+
+    # --- Extract Cosmos people data from all possible locations ---
+    # 1. Directly in response (if proxy forwards cosmos_output)
+    if "people" in report and isinstance(report["people"], list):
+        people = report["people"]
+        people_count = report.get("people_count", len(people))
+    elif "cosmos_output" in report:
+        cosmos = report["cosmos_output"]
+        if isinstance(cosmos, dict):
+            people = cosmos.get("people", [])
+            people_count = cosmos.get("people_count", len(people))
+    # 2. Parse Cosmos JSON from Nemotron thinking text (between <think> and </think>)
+    elif raw_content:
+        think_match = _re.search(r'<think>([\s\S]*?)</think>', raw_content)
+        if think_match:
+            think_text = think_match.group(1)
+            cosmos_match = _re.search(r'\{[\s\S]*?"people"\s*:\s*\[[\s\S]*?\]\s*\}', think_text)
+            if cosmos_match:
+                try:
+                    cosmos_data = json.loads(cosmos_match.group())
+                    people = cosmos_data.get("people", [])
+                    people_count = cosmos_data.get("people_count", len(people))
+                except json.JSONDecodeError:
+                    pass
+    # 3. If compliance itself has people (Cosmos format passed through)
+    if not people and compliance and "people" in compliance:
+        people = compliance.get("people", [])
+        people_count = compliance.get("people_count", len(people))
+
+    # Build violation subjects set for cross-referencing
+    violation_subjects = {v.get("subject", "").lower() for v in violations}
+
+    # If we have people data, mark each person's compliance status
+    enriched_people = []
+    for p in people:
+        person_name = p.get("person", "")
+        is_violator = person_name.lower() in violation_subjects
+        enriched_people.append({
+            **p,
+            "compliant": not is_violator,
+            "violation": next((v for v in violations if v.get("subject", "").lower() == person_name.lower()), None)
+        })
 
     return {
         "status": status,
         "violation_count": len(violations),
         "violations": violations,
+        "people": enriched_people,
+        "people_count": people_count or len(enriched_people),
         "raw": report,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -296,6 +499,9 @@ async def analyze(req: AnalyzeRequest):
         session_stats["clips_analyzed"] += 1
         if report["violation_count"] > 0:
             session_stats["alerts"] += 1
+            # Send email alert in background
+            import threading
+            threading.Thread(target=send_alert_email, args=(report,), daemon=True).start()
 
         # Keep history (last 50)
         analysis_history.insert(0, report)
@@ -326,6 +532,8 @@ async def analyze_upload(file: UploadFile = File(...)):
         session_stats["clips_analyzed"] += 1
         if report["violation_count"] > 0:
             session_stats["alerts"] += 1
+            import threading
+            threading.Thread(target=send_alert_email, args=(report,), daemon=True).start()
         analysis_history.insert(0, report)
         if len(analysis_history) > 50:
             analysis_history.pop()

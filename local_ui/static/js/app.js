@@ -79,6 +79,12 @@ const el = {
     fps:             $("#fps"),
     autoAnalyze:     $("#autoAnalyze"),
     promptText:      $("#promptText"),
+    // email
+    emailAlertsEnabled: $("#emailAlertsEnabled"),
+    alertEmail:      $("#alertEmail"),
+    locationLabel:   $("#locationLabel"),
+    resendApiKey:    $("#resendApiKey"),
+    emailFrom:       $("#emailFrom"),
     btnSaveAll:      $("#btnSaveAll"),
     btnResetAll:     $("#btnResetAll"),
     btnTestConn:     $("#btnTestConn"),
@@ -229,6 +235,12 @@ function populateSettings(c) {
     el.fps.value = c.fps || 4;
     el.autoAnalyze.checked = c.auto_analyze !== false;
     el.promptText.value = c.prompt || "";
+    // email
+    el.emailAlertsEnabled.checked = c.email_alerts_enabled !== false;
+    el.alertEmail.value = c.alert_email || "";
+    el.locationLabel.value = c.location || "";
+    el.resendApiKey.value = c.resend_api_key || "";
+    el.emailFrom.value = c.email_from || "Compliance Vision <onboarding@resend.dev>";
 }
 
 function gatherSettings() {
@@ -243,6 +255,12 @@ function gatherSettings() {
         fps: parseInt(el.fps.value) || 4,
         auto_analyze: el.autoAnalyze.checked,
         prompt: el.promptText.value,
+        // email
+        email_alerts_enabled: el.emailAlertsEnabled.checked,
+        alert_email: el.alertEmail.value.trim(),
+        location: el.locationLabel.value.trim(),
+        resend_api_key: el.resendApiKey.value.trim(),
+        email_from: el.emailFrom.value.trim(),
     };
 }
 
@@ -449,44 +467,16 @@ async function sendForAnalysis(videoB64) {
 function handleReport(report, { addToHistory = true } = {}) {
     if (addToHistory) state.clipsAnalyzed++;
 
-    // Try to parse the model's content from the raw DGX response
-    let parsed = null;
-    try {
-        if (report.raw && report.raw.choices && report.raw.choices[0]) {
-            const content = report.raw.choices[0].message.content;
-            // Try to extract JSON from the content
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                parsed = JSON.parse(jsonMatch[0]);
-            }
-        }
-    } catch (e) {
-        console.warn("Could not parse model response as JSON:", e);
-    }
+    // The backend format_report() normalizes the DGX response into:
+    //   { status, violation_count, violations, raw, timestamp }
+    // Use status and violation_count directly — they're already parsed server-side.
+    const status = (report.status || "UNKNOWN").toUpperCase();
+    const violations = report.violations || [];
+    const violationCount = report.violation_count || violations.length;
 
-    // Determine compliance
-    let compliant = true;
-    let incidentCount = 0;
-
-    if (parsed) {
-        if (parsed.people && Array.isArray(parsed.people)) {
-            parsed.people.forEach((p) => {
-                if (p.badge_visible === false && p.facing_camera === true) {
-                    compliant = false;
-                    incidentCount++;
-                }
-                if (p.compliant === false) {
-                    compliant = false;
-                    incidentCount++;
-                }
-            });
-        }
-    }
-    // Always check backend compliance result (outside parsed block)
-    if (report.violation_count > 0) {
-        compliant = false;
-        incidentCount = Math.max(incidentCount, report.violation_count);
-    }
+    // Determine compliance from the normalized status
+    const compliant = (status === "COMPLIANT" || status === "CLEAR") && violationCount === 0;
+    const incidentCount = violationCount;
 
     // Update stats
     state.totalIncidents += incidentCount;
@@ -494,60 +484,69 @@ function handleReport(report, { addToHistory = true } = {}) {
     updateStats();
 
     // Stat card color feedback
-    const statusEl = el.complianceStatus;
-    statusEl.style.color = compliant ? "var(--green)" : "var(--red)";
+    el.complianceStatus.style.color = compliant ? "var(--green)" : "var(--red)";
 
     // Show result
     el.resultEmpty.style.display = "none";
     el.resultContent.style.display = "block";
-    el.resultBadge.textContent = compliant ? "COMPLIANT" : "VIOLATION";
+    el.resultBadge.textContent = compliant ? "COMPLIANT" : "NON-COMPLIANT";
     el.resultBadge.className = `result-badge ${compliant ? "ok" : "bad"}`;
     el.resultTs.textContent = report.timestamp || new Date().toLocaleTimeString();
 
     // Populate details
     let detailsHTML = "";
+    const people = report.people || [];
+    const peopleCount = report.people_count || 0;
 
-    if (parsed && parsed.people && Array.isArray(parsed.people)) {
-        el.resultPeople.textContent = `${parsed.people_count || parsed.people.length} person(s) detected`;
-        parsed.people.forEach((p) => {
-            const icon = p.facing_camera ? "👤" : "🔄";
-            let badgeClass = "na", badgeText = "N/A";
-            if (p.facing_camera && p.badge_visible === true) { badgeClass = "yes"; badgeText = "Badge ✓"; }
-            else if (p.facing_camera && p.badge_visible === false) { badgeClass = "no"; badgeText = "No Badge"; }
-            else if (p.compliant === true) { badgeClass = "yes"; badgeText = "Compliant"; }
-            else if (p.compliant === false) { badgeClass = "no"; badgeText = "Non-Compliant"; }
-
+    if (people.length > 0) {
+        // Show ALL people with their compliance status
+        el.resultPeople.textContent = `${peopleCount} person(s) detected`;
+        people.forEach((p) => {
+            const isCompliant = p.compliant !== false;
+            const icon = p.facing_camera === false ? "🔄" : (isCompliant ? "✅" : "🚨");
+            let badgeClass, badgeText;
+            if (p.facing_camera === false) {
+                badgeClass = "na"; badgeText = "Not Facing";
+            } else if (isCompliant) {
+                badgeClass = "yes"; badgeText = "Badge ✓";
+            } else {
+                badgeClass = "no"; badgeText = "No Badge";
+            }
+            const borderColor = isCompliant ? "var(--green)" : "var(--red)";
             detailsHTML += `
-                <div class="person-row">
+                <div class="person-row" style="border-left: 3px solid ${borderColor};">
                     <span class="person-icon">${icon}</span>
                     <div class="person-info">
-                        <div class="person-name">${p.person || "Person"}</div>
-                        <div class="person-desc">${p.description || ""}</div>
+                        <div class="person-name">${escapeHtml(p.person || "Person")}</div>
+                        <div class="person-desc">${escapeHtml(p.description || "")}</div>
                     </div>
                     <span class="person-badge ${badgeClass}">${badgeText}</span>
                 </div>`;
         });
-    } else if (parsed) {
-        el.resultPeople.textContent = `${parsed.people_count || 0} person(s)`;
-        if (parsed.scene_description) {
-            detailsHTML += `<p style="font-size:12px;color:var(--text-2);margin-bottom:8px">${parsed.scene_description}</p>`;
-        }
-        if (parsed.concerns && parsed.concerns.length) {
-            parsed.concerns.forEach((c) => {
-                detailsHTML += `
-                    <div class="violation-row">
-                        <div class="violation-rule">${c}</div>
-                    </div>`;
-            });
-        }
+    } else if (violations.length > 0) {
+        // Fallback: no people data, show violations only
+        el.resultPeople.textContent = `${violationCount} violation(s)`;
+        violations.forEach((v) => {
+            detailsHTML += `
+                <div class="violation-row">
+                    <div class="violation-subj">${escapeHtml(v.subject || "Unknown")}</div>
+                    <div class="violation-rule">${escapeHtml(v.rule || "Violation")}</div>
+                    <div class="violation-desc">${escapeHtml(v.description || "")}</div>
+                </div>`;
+        });
+    } else if (compliant) {
+        el.resultPeople.textContent = "No violations";
+        detailsHTML = `
+            <div class="person-row" style="border-left: 3px solid var(--green);">
+                <span class="person-icon">✅</span>
+                <div class="person-info">
+                    <div class="person-name" style="color: var(--green);">All Clear</div>
+                    <div class="person-desc">No compliance violations detected</div>
+                </div>
+            </div>`;
     } else {
-        // Raw text fallback
         el.resultPeople.textContent = "";
-        let rawText = "";
-        try {
-            rawText = report.raw?.choices?.[0]?.message?.content || JSON.stringify(report.raw, null, 2);
-        } catch { rawText = JSON.stringify(report, null, 2); }
-        detailsHTML = `<pre class="raw-json" style="display:block;max-height:250px">${escapeHtml(rawText)}</pre>`;
+        detailsHTML = `<pre class="raw-json" style="display:block;max-height:250px">${escapeHtml(JSON.stringify(report.raw || report, null, 2))}</pre>`;
     }
 
     el.resultDetails.innerHTML = detailsHTML;
@@ -557,14 +556,14 @@ function handleReport(report, { addToHistory = true } = {}) {
 
     // Add to history
     if (addToHistory) {
-        addHistoryItem(report, compliant, parsed);
+        addHistoryItem(report, compliant);
         toast(compliant ? "Compliant ✓" : `${incidentCount} violation(s) detected`, compliant ? "success" : "error");
     }
 }
 
 /* ─── History ────────────────────────────────────────────── */
-function addHistoryItem(report, compliant, parsed) {
-    const item = { report, compliant, parsed, time: new Date().toLocaleTimeString() };
+function addHistoryItem(report, compliant) {
+    const item = { report, compliant, time: new Date().toLocaleTimeString() };
     state.history.unshift(item);
     if (state.history.length > 50) state.history.pop();
     renderHistory();
@@ -576,12 +575,13 @@ function renderHistory() {
         return;
     }
     el.historyList.innerHTML = state.history.map((h, i) => {
-        const people = h.parsed?.people_count || h.parsed?.people?.length || "?";
+        const vCount = h.report?.violation_count || 0;
+        const label = vCount > 0 ? `${vCount} violation(s)` : "Clear";
         return `
         <div class="h-item" data-idx="${i}">
             <div>
                 <span class="h-badge ${h.compliant ? "ok" : "bad"}">${h.compliant ? "OK" : "ALERT"}</span>
-                <span class="h-info">${people} person(s)</span>
+                <span class="h-info">${label}</span>
             </div>
             <span class="h-time">${h.time}</span>
         </div>`;
@@ -621,7 +621,37 @@ function stopMonitoring() {
 }
 
 /* ─── File Upload ────────────────────────────────────────── */
+function showUploadPreview(file) {
+    const preview = $("#uploadPreview");
+    const url = URL.createObjectURL(file);
+    preview.src = url;
+    preview.style.display = "block";
+    preview.play().catch(() => {});
+    // Hide webcam & placeholder, show overlay
+    el.webcamVideo.classList.remove("active");
+    el.videoPlaceholder.classList.add("hidden");
+    el.videoOverlay.classList.add("active");
+    el.clipBadge.textContent = file.name.length > 20 ? file.name.slice(0, 17) + "..." : file.name;
+    // Clean up object URL when done
+    preview.onended = () => {};
+    preview.onerror = () => URL.revokeObjectURL(url);
+}
+
+function hideUploadPreview() {
+    const preview = $("#uploadPreview");
+    if (preview.src) {
+        URL.revokeObjectURL(preview.src);
+        preview.src = "";
+    }
+    preview.style.display = "none";
+    if (!state.cameraOn) {
+        el.videoPlaceholder.classList.remove("hidden");
+        el.videoOverlay.classList.remove("active");
+    }
+}
+
 async function handleFileUpload(file) {
+    showUploadPreview(file);
     setPipeline("uploading");
     const formData = new FormData();
     formData.append("file", file);
@@ -636,9 +666,14 @@ async function handleFileUpload(file) {
         const report = await r.json();
         setPipeline("complete");
         handleReport(report);
-        setTimeout(() => setPipeline("idle"), 3000);
+        // Keep preview visible for a bit, then clean up
+        setTimeout(() => {
+            setPipeline("idle");
+            if (!state.cameraOn) hideUploadPreview();
+        }, 5000);
     } catch (e) {
         setPipeline("idle");
+        hideUploadPreview();
         toast("Upload error: " + e.message, "error");
     }
 }

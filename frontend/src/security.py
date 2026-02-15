@@ -80,11 +80,11 @@ def check_proxy_connection():
     try:
         resp = requests.get(f"http://{SPARK_IP}:8001/health", timeout=5)
         if resp.status_code in [200, 404]:  # 404 is ok, means server is up
-            print(f"✅ Connected to DGX Proxy at {SPARK_IP}:8001")
+            print(f" Connected to DGX Proxy at {SPARK_IP}:8001")
             return True
     except requests.ConnectionError:
         pass
-    print(f"❌ Cannot reach DGX Proxy at {SPARK_IP}:8001")
+    print(f" Cannot reach DGX Proxy at {SPARK_IP}:8001")
     print(f"   Make sure vlm_listener.py is running on the DGX!")
     return False
 
@@ -277,7 +277,7 @@ def analysis_worker(frame_buffer, buffer_lock):
                     subject = v.get("subject", "Unknown")
                     rule = v.get("rule", "Rule")
                     desc = v.get("description", "")
-                    print(f"  👤 [{subject}] ⛔ {rule}")
+                    print(f"  👤 [{subject}]  {rule}")
                     if desc:
                         print(f"     {desc}")
                 print(f"{'='*50}\n")
@@ -287,10 +287,10 @@ def analysis_worker(frame_buffer, buffer_lock):
 
         except requests.Timeout:
             current_status = "Timeout"
-            print(f"[{timestamp}] ⏳ Request timed out")
+            print(f"[{timestamp}]  Request timed out")
         except Exception as e:
             current_status = "Error"
-            print(f"[{timestamp}] ❌ Error: {e}")
+            print(f"[{timestamp}]  Error: {e}")
         finally:
             try:
                 os.unlink(video_path)
@@ -306,7 +306,7 @@ def main():
 
     cap = cv2.VideoCapture(CAMERA_INDEX)
     if not cap.isOpened():
-        print("❌ Cannot open webcam")
+        print(" Cannot open webcam")
         return
 
     print(f"\n{'='*50}")
