@@ -1,0 +1,21 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Data / temp files
+uploads/
+keyframes/
+data/
+
+# OS
+.DS_Store
+
+# Node (for frontend later)
+node_modules/
+dist/
