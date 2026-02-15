@@ -248,6 +248,26 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-0); col
 .settings-card { padding: 0; }
 .settings-card .card-body { padding: 14px 16px; }
 .span-full { grid-column: 1 / -1; }
+
+/* ─── Provider Selector ─────────────────────────────────── */
+.provider-selector { display: flex; gap: 12px; }
+.provider-option { flex: 1; cursor: pointer; }
+.provider-option input[type="radio"] { display: none; }
+.provider-card {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 16px 12px; border-radius: var(--r-md);
+    background: var(--bg-3); border: 2px solid var(--border);
+    transition: all 150ms ease; text-align: center;
+}
+.provider-card:hover { border-color: var(--accent); background: var(--bg-4); }
+.provider-option input[type="radio"]:checked + .provider-card {
+    border-color: var(--accent); background: rgba(99,102,241,0.08);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
+}
+.provider-icon { font-size: 24px; }
+.provider-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.provider-desc { font-size: 11px; color: var(--text-3); }
+
 .settings-footer { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 
 /* ─── Form ──────────────────────────────────────────────── */

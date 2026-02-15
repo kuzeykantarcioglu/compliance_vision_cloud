@@ -214,7 +214,31 @@
                 </div>
 
                 <div class="settings-grid">
-                    <div class="card settings-card">
+                    <div class="card settings-card span-full">
+                        <h3 class="card-title-sm">AI Provider</h3>
+                        <div class="card-body">
+                            <div class="provider-selector">
+                                <label class="provider-option" id="providerLocal">
+                                    <input type="radio" name="aiProvider" value="local" checked>
+                                    <div class="provider-card">
+                                        <span class="provider-icon">🖥️</span>
+                                        <span class="provider-name">Local DGX</span>
+                                        <span class="provider-desc">Cosmos + Nemotron on NVIDIA DGX</span>
+                                    </div>
+                                </label>
+                                <label class="provider-option" id="providerOpenai">
+                                    <input type="radio" name="aiProvider" value="openai">
+                                    <div class="provider-card">
+                                        <span class="provider-icon">🤖</span>
+                                        <span class="provider-name">OpenAI</span>
+                                        <span class="provider-desc">GPT-4o / GPT-4o-mini Vision API</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card" id="dgxSettingsCard">
                         <h3 class="card-title-sm">DGX Connection</h3>
                         <div class="card-body">
                             <div class="form-group">
@@ -226,6 +250,23 @@
                                 <div class="form-group"><label>Endpoint</label><input type="text" id="endpointPath" placeholder="/v1/analyze_frame_sync"></div>
                             </div>
                             <button class="btn btn-secondary btn-sm" id="btnTestConn">Test Connection</button>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card" id="openaiSettingsCard" style="display:none;">
+                        <h3 class="card-title-sm">OpenAI API</h3>
+                        <div class="card-body">
+                            <div class="form-group"><label>API Key</label><input type="password" id="openaiApiKey" placeholder="sk-..."></div>
+                            <div class="form-group">
+                                <label>Model</label>
+                                <select id="openaiModel">
+                                    <option value="gpt-4o">GPT-4o (best quality)</option>
+                                    <option value="gpt-4o-mini">GPT-4o-mini (faster & cheaper)</option>
+                                    <option value="gpt-4.1">GPT-4.1 (latest)</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1-mini (latest mini)</option>
+                                </select>
+                            </div>
+                            <p class="muted small" style="margin-top:8px;">Extracts frames from video and sends to OpenAI Vision. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#818cf8;">platform.openai.com</a></p>
                         </div>
                     </div>
 
@@ -266,6 +307,7 @@
                             <div class="form-group"><label>Resend API Key</label><input type="password" id="resendApiKey" placeholder="re_xxxxxxxxxx"></div>
                             <div class="form-group"><label>From Address</label><input type="text" id="emailFrom" placeholder="Compliance Vision <onboarding@resend.dev>"></div>
                             <p class="muted small" style="margin-top:8px;">Get a free API key at <a href="https://resend.com" target="_blank" style="color:#818cf8;">resend.com</a> &mdash; 100 emails/day free, no setup.</p>
+                            <button class="btn btn-secondary btn-sm" id="btnTestEmail" style="margin-top:10px;">Send Test Email</button>
                         </div>
                     </div>
 

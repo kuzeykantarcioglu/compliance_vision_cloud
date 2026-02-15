@@ -78,6 +78,9 @@ RULES:
     "clip_duration": 3,
     "fps": 4,
     "auto_analyze": True,
+    "ai_provider": "local",
+    "openai_api_key": "",
+    "openai_model": "gpt-4o",
     "alert_email": "userdorukhan@gmail.com",
     "email_alerts_enabled": True,
     "resend_api_key": "",
@@ -104,6 +107,9 @@ class ConfigUpdate(BaseModel):
     clip_duration: Optional[int] = None
     fps: Optional[int] = None
     auto_analyze: Optional[bool] = None
+    ai_provider: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_model: Optional[str] = None
     alert_email: Optional[str] = None
     email_alerts_enabled: Optional[bool] = None
     resend_api_key: Optional[str] = None
@@ -355,6 +361,116 @@ def analyze_video(video_b64: str, prompt: str, max_tokens: int, temperature: flo
     return data
 
 
+def analyze_video_openai(video_b64: str, prompt: str, max_tokens: int, temperature: float):
+    """Send video frames to OpenAI Vision API for analysis.
+    Extracts key frames from the video and sends them as images."""
+    api_key = config.get("openai_api_key", "").strip()
+    if not api_key:
+        raise RuntimeError("OpenAI API key not configured. Go to Settings to add it.")
+
+    model = config.get("openai_model", "gpt-4o")
+    logger.info(f"Analyzing with OpenAI {model}")
+
+    # Decode video and extract frames
+    try:
+        raw_bytes = base64.b64decode(video_b64)
+        mp4_bytes = convert_webm_to_mp4(raw_bytes)
+    except Exception as e:
+        logger.error(f"Video conversion error: {e}")
+        mp4_bytes = base64.b64decode(video_b64)
+
+    # Write to temp file and extract frames with OpenCV
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        tmp.write(mp4_bytes)
+        tmp_path = tmp.name
+
+    frames_b64 = []
+    try:
+        cap = cv2.VideoCapture(tmp_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 4
+        duration = total_frames / fps if fps > 0 else 1
+
+        # Extract up to 8 evenly-spaced frames
+        num_frames = min(8, max(1, total_frames))
+        frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
+
+        for idx in frame_indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if ret:
+                # Resize if too large (max 1024px on longest side)
+                h, w = frame.shape[:2]
+                if max(h, w) > 1024:
+                    scale = 1024 / max(h, w)
+                    frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+                _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                frames_b64.append(base64.b64encode(buf).decode())
+        cap.release()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    if not frames_b64:
+        raise RuntimeError("Could not extract any frames from video")
+
+    logger.info(f"Extracted {len(frames_b64)} frames for OpenAI analysis")
+
+    # Build OpenAI Vision message with multiple images
+    content = []
+    for i, fb64 in enumerate(frames_b64):
+        content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{fb64}",
+                "detail": "high" if len(frames_b64) <= 4 else "low"
+            }
+        })
+    content.append({
+        "type": "text",
+        "text": f"These are {len(frames_b64)} frames extracted from a {duration:.1f}s video clip. " + prompt
+    })
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": content}
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature
+    }
+
+    response = requests.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=120,
+    )
+
+    logger.info(f"OpenAI response status: {response.status_code}")
+    data = response.json()
+    logger.info(f"OpenAI response: {json.dumps(data)[:1000]}")
+
+    if "error" in data:
+        raise RuntimeError(data["error"].get("message", str(data["error"])))
+    return data
+
+
+def run_analysis(video_b64: str, prompt: str, max_tokens: int, temperature: float):
+    """Route analysis to the configured AI provider."""
+    provider = config.get("ai_provider", "local")
+    logger.info(f"Using AI provider: {provider}")
+    if provider == "openai":
+        return analyze_video_openai(video_b64, prompt, max_tokens, temperature)
+    else:
+        return analyze_video(video_b64, prompt, max_tokens, temperature)
+
+
 def format_report(report):
     """Format compliance report for display.
     Handles both direct Nemotron output and OpenAI-wrapped format.
@@ -422,10 +538,40 @@ def format_report(report):
     for p in people:
         person_name = p.get("person", "")
         is_violator = person_name.lower() in violation_subjects
+        # Also check badge_visible from Cosmos — if explicitly false, not compliant
+        badge_visible = p.get("badge_visible")
+        facing_camera = p.get("facing_camera")
+        if facing_camera is False:
+            is_compliant = None  # Indeterminate — not facing
+        elif badge_visible is False:
+            is_compliant = False  # Cosmos says no badge
+        elif is_violator:
+            is_compliant = False  # Nemotron flagged as violation
+        else:
+            is_compliant = True
         enriched_people.append({
             **p,
-            "compliant": not is_violator,
+            "compliant": is_compliant if is_compliant is not None else (not is_violator),
             "violation": next((v for v in violations if v.get("subject", "").lower() == person_name.lower()), None)
+        })
+
+    # Generate violations from people data if Nemotron didn't provide explicit violations
+    # but people have badge_visible=false (i.e. Cosmos detected missing badges)
+    if not violations and enriched_people:
+        for p in enriched_people:
+            if p.get("compliant") is False:
+                violations.append({
+                    "subject": p.get("person", "Unknown"),
+                    "rule": "Badge Required",
+                    "description": p.get("description", "No visible badge detected"),
+                })
+
+    # If status came back as non-compliant but no violations were found, set a generic one
+    if status == "NON-COMPLIANT" and not violations:
+        violations.append({
+            "subject": "General",
+            "rule": "Compliance Violation",
+            "description": "Non-compliant status detected by analysis model",
         })
 
     return {
@@ -485,6 +631,24 @@ async def test_connection():
     }
 
 
+@app.post("/api/test-email")
+async def test_email():
+    """Send a test email to verify Resend configuration."""
+    test_report = {
+        "status": "NON-COMPLIANT",
+        "violation_count": 1,
+        "violations": [{"subject": "Test Person", "rule": "Badge Required", "description": "This is a test alert"}],
+        "people": [{"person": "Test Person", "compliant": False, "badge_visible": False, "facing_camera": True, "description": "Test person for email verification"}],
+        "people_count": 1,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    try:
+        send_alert_email(test_report)
+        return {"status": "ok", "message": f"Test email sent to {config.get('alert_email', 'N/A')}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.post("/api/analyze")
 async def analyze(req: AnalyzeRequest):
     prompt = req.prompt_override or config["prompt"]
@@ -492,7 +656,7 @@ async def analyze(req: AnalyzeRequest):
     temperature = req.temperature_override or config["temperature"]
 
     try:
-        raw_report = analyze_video(req.video_base64, prompt, max_tokens, temperature)
+        raw_report = run_analysis(req.video_base64, prompt, max_tokens, temperature)
         report = format_report(raw_report)
 
         # Update session stats
@@ -527,7 +691,7 @@ async def analyze_upload(file: UploadFile = File(...)):
     video_b64 = base64.b64encode(contents).decode()
 
     try:
-        raw_report = analyze_video(video_b64, config["prompt"], config["max_tokens"], config["temperature"])
+        raw_report = run_analysis(video_b64, config["prompt"], config["max_tokens"], config["temperature"])
         report = format_report(raw_report)
         session_stats["clips_analyzed"] += 1
         if report["violation_count"] > 0:
@@ -581,7 +745,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     max_tokens = msg.get("max_tokens", config["max_tokens"])
                     temperature = msg.get("temperature", config["temperature"])
 
-                    raw_report = analyze_video(video_b64, prompt, max_tokens, temperature)
+                    raw_report = run_analysis(video_b64, prompt, max_tokens, temperature)
                     report = format_report(raw_report)
 
                     session_stats["clips_analyzed"] += 1

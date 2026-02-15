@@ -79,12 +79,18 @@ const el = {
     fps:             $("#fps"),
     autoAnalyze:     $("#autoAnalyze"),
     promptText:      $("#promptText"),
+    // ai provider
+    dgxSettingsCard: $("#dgxSettingsCard"),
+    openaiSettingsCard: $("#openaiSettingsCard"),
+    openaiApiKey:    $("#openaiApiKey"),
+    openaiModel:     $("#openaiModel"),
     // email
     emailAlertsEnabled: $("#emailAlertsEnabled"),
     alertEmail:      $("#alertEmail"),
     locationLabel:   $("#locationLabel"),
     resendApiKey:    $("#resendApiKey"),
     emailFrom:       $("#emailFrom"),
+    btnTestEmail:    $("#btnTestEmail"),
     btnSaveAll:      $("#btnSaveAll"),
     btnResetAll:     $("#btnResetAll"),
     btnTestConn:     $("#btnTestConn"),
@@ -235,6 +241,12 @@ function populateSettings(c) {
     el.fps.value = c.fps || 4;
     el.autoAnalyze.checked = c.auto_analyze !== false;
     el.promptText.value = c.prompt || "";
+    // ai provider
+    const provider = c.ai_provider || "local";
+    document.querySelector(`input[name="aiProvider"][value="${provider}"]`).checked = true;
+    toggleProviderCards(provider);
+    el.openaiApiKey.value = c.openai_api_key || "";
+    el.openaiModel.value = c.openai_model || "gpt-4o";
     // email
     el.emailAlertsEnabled.checked = c.email_alerts_enabled !== false;
     el.alertEmail.value = c.alert_email || "";
@@ -255,6 +267,10 @@ function gatherSettings() {
         fps: parseInt(el.fps.value) || 4,
         auto_analyze: el.autoAnalyze.checked,
         prompt: el.promptText.value,
+        // ai provider
+        ai_provider: document.querySelector('input[name="aiProvider"]:checked').value,
+        openai_api_key: el.openaiApiKey.value.trim(),
+        openai_model: el.openaiModel.value,
         // email
         email_alerts_enabled: el.emailAlertsEnabled.checked,
         alert_email: el.alertEmail.value.trim(),
@@ -502,19 +518,25 @@ function handleReport(report, { addToHistory = true } = {}) {
         // Show ALL people with their compliance status
         el.resultPeople.textContent = `${peopleCount} person(s) detected`;
         people.forEach((p) => {
-            const isCompliant = p.compliant !== false;
-            const icon = p.facing_camera === false ? "🔄" : (isCompliant ? "✅" : "🚨");
-            let badgeClass, badgeText;
-            if (p.facing_camera === false) {
-                badgeClass = "na"; badgeText = "Not Facing";
+            const hasBadge = p.badge_visible === true;
+            const noBadge = p.badge_visible === false;
+            const notFacing = p.facing_camera === false;
+            const isCompliant = p.compliant !== false && !noBadge;
+            const icon = notFacing ? "🔄" : (isCompliant ? "✅" : "🚨");
+            let badgeClass, badgeText, borderColor;
+            if (notFacing) {
+                badgeClass = "na"; badgeText = "Not Facing"; borderColor = "var(--yellow)";
+            } else if (hasBadge) {
+                badgeClass = "yes"; badgeText = "Badge ✓"; borderColor = "var(--green)";
+            } else if (noBadge) {
+                badgeClass = "no"; badgeText = "No Badge"; borderColor = "var(--red)";
             } else if (isCompliant) {
-                badgeClass = "yes"; badgeText = "Badge ✓";
+                badgeClass = "yes"; badgeText = "Compliant"; borderColor = "var(--green)";
             } else {
-                badgeClass = "no"; badgeText = "No Badge";
+                badgeClass = "no"; badgeText = "Violation"; borderColor = "var(--red)";
             }
-            const borderColor = isCompliant ? "var(--green)" : "var(--red)";
             detailsHTML += `
-                <div class="person-row" style="border-left: 3px solid ${borderColor};">
+                    <div class="person-row" style="border-left: 3px solid ${borderColor};">
                     <span class="person-icon">${icon}</span>
                     <div class="person-info">
                         <div class="person-name">${escapeHtml(p.person || "Person")}</div>
@@ -722,6 +744,54 @@ el.btnRawToggle.addEventListener("click", () => {
 // Settings
 el.btnSaveAll.addEventListener("click", saveSettings);
 el.btnResetAll.addEventListener("click", resetSettings);
+
+// Test email
+el.btnTestEmail.addEventListener("click", async () => {
+    // Save email settings first
+    await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            email_alerts_enabled: el.emailAlertsEnabled.checked,
+            alert_email: el.alertEmail.value.trim(),
+            location: el.locationLabel.value.trim(),
+            resend_api_key: el.resendApiKey.value.trim(),
+            email_from: el.emailFrom.value.trim(),
+        }),
+    });
+    try {
+        const r = await fetch("/api/test-email", { method: "POST" });
+        const data = await r.json();
+        toast(data.status === "ok" ? `Test email sent! Check ${el.alertEmail.value}` : data.message, data.status === "ok" ? "success" : "error");
+    } catch (e) {
+        toast("Failed to send test email", "error");
+    }
+});
+
+// AI Provider toggle — auto-save on change
+document.querySelectorAll('input[name="aiProvider"]').forEach(radio => {
+    radio.addEventListener("change", async (e) => {
+        const provider = e.target.value;
+        toggleProviderCards(provider);
+        // Immediately save provider to backend so it takes effect without clicking Save
+        try {
+            await fetch("/api/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ai_provider: provider }),
+            });
+            toast(`Switched to ${provider === "openai" ? "OpenAI" : "Local DGX"}`, "success");
+        } catch (err) {
+            toast("Failed to switch provider", "error");
+        }
+    });
+});
+
+function toggleProviderCards(provider) {
+    el.dgxSettingsCard.style.display = provider === "local" ? "" : "none";
+    el.openaiSettingsCard.style.display = provider === "openai" ? "" : "none";
+}
+
 el.btnTestConn.addEventListener("click", async () => {
     // Save connection fields first
     await fetch("/api/config", {
