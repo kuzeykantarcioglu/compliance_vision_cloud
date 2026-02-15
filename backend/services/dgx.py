@@ -101,9 +101,12 @@ def _frames_to_mp4_base64(frame_b64_list: list[str], fps: int = 4) -> str:
     This is the format the DGX Cosmos proxy expects.
     """
     import os as _os
+    import time as _time
 
     if not frame_b64_list:
         raise ValueError("No frames provided for mp4 conversion")
+
+    t0 = _time.perf_counter()
 
     # Decode all JPEGs → numpy arrays
     cv_frames = []
@@ -120,6 +123,7 @@ def _frames_to_mp4_base64(frame_b64_list: list[str], fps: int = 4) -> str:
         raise ValueError("All frames failed to decode")
 
     h, w = cv_frames[0].shape[:2]
+    t_decode = _time.perf_counter()
 
     # Create temp mp4 file — use mkstemp to avoid Windows file-locking issues
     fd, tmp_path = tempfile.mkstemp(suffix=".mp4")
@@ -139,9 +143,11 @@ def _frames_to_mp4_base64(frame_b64_list: list[str], fps: int = 4) -> str:
         except OSError:
             pass
 
+    t_encode = _time.perf_counter()
     logger.info(
         f"🎞️  Created mp4 from {len(cv_frames)} frames ({w}x{h} @ {fps}fps) "
-        f"→ {len(video_b64)} chars base64"
+        f"→ {len(video_b64)} chars base64  "
+        f"[decode={t_decode - t0:.3f}s, encode={t_encode - t_decode:.3f}s]"
     )
     return video_b64
 
@@ -383,26 +389,24 @@ async def analyze_frame_dgx(
 
     payload = _build_dgx_request(frames_to_send, policy)
 
-    # ── Log outgoing request ──────────────────────────────────────────
-    logger.info(
-        f"➡️  DGX REQUEST  url={DGX_PROXY_URL}  model={DGX_MODEL_ID}\n"
-        f"    frames={len(frames_to_send)}\n"
-        f"    prompt (first 300 chars): {_build_dgx_prompt(policy)[:300]}"
-    )
-    # Log the full payload structure (with video data truncated)
-    payload_log = json.loads(json.dumps(payload))  # deep copy
+    # ── Log outgoing request (without deep-copying the huge payload) ──
+    import time as _time
+    from datetime import datetime as _dt
+    video_url_len = 0
     try:
-        for msg in payload_log.get("messages", []):
-            for part in msg.get("content", []):
-                if part.get("type") == "video_url":
-                    url = part["video_url"]["url"]
-                    part["video_url"]["url"] = url[:60] + f"...[{len(url)} chars total]"
+        video_url_len = len(payload["messages"][0]["content"][0]["video_url"]["url"])
     except Exception:
         pass
-    logger.info(f"➡️  DGX PAYLOAD: {json.dumps(payload_log, indent=2)}")
+    logger.info(
+        f"🚀 [{_dt.now().strftime('%H:%M:%S')}] SENDING REQUEST TO DGX SPARK\n"
+        f"    URL: {DGX_PROXY_URL}\n"
+        f"    Frames: {len(frames_to_send)}  |  Payload size: {video_url_len} chars base64"
+    )
 
     # ── Send request synchronously in a thread pool ───────────────────
     # (httpx.AsyncClient has Windows async socket issues; requests works reliably)
+    t_send_start = _time.perf_counter()
+
     def _send_sync():
         return sync_requests.post(
             DGX_PROXY_URL,
@@ -413,13 +417,15 @@ async def analyze_frame_dgx(
     try:
         response = await asyncio.to_thread(_send_sync)
 
+        t_send_end = _time.perf_counter()
+        elapsed = t_send_end - t_send_start
+
         # ── Log raw HTTP response ─────────────────────────────────────
         logger.info(
-            f"⬅️  DGX HTTP RESPONSE  status={response.status_code}  "
-            f"content_length={response.headers.get('content-length', '?')}  "
-            f"content_type={response.headers.get('content-type', '?')}"
+            f"📥 [{_dt.now().strftime('%H:%M:%S')}] DGX SPARK RESPONDED\n"
+            f"    Status: {response.status_code}  |  ⏱️ Round-trip: {elapsed:.1f}s\n"
+            f"    Body: {response.text[:500]}"
         )
-        logger.info(f"⬅️  DGX RAW BODY: {response.text[:2000]}")
 
         # Parse JSON BEFORE raise_for_status — the DGX proxy returns JSON
         # error bodies on 502/5xx (e.g. {"error": "Cosmos unreachable"}).
